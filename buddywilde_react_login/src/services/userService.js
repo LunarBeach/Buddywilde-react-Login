@@ -10,7 +10,7 @@ export const userService = {
       return result
     } catch (error) {
       console.error('Failed to check user existence:', error)
-      throw new Error('Failed to check user existence')
+      return { email_exists: false, display_name_exists: false }
     }
   },
 
@@ -23,7 +23,7 @@ export const userService = {
       return result
     } catch (error) {
       console.error('Failed to register user:', error)
-      throw new Error('Failed to register user')
+      throw error
     }
   },
 
@@ -36,7 +36,59 @@ export const userService = {
       return result
     } catch (error) {
       console.error('Failed to login user:', error)
-      throw new Error('Failed to login user')
+      throw error
+    }
+  },
+
+  async verifyEmail(userData) {
+    try {
+      const result = await api.post('/bw-db-credentials.php', {
+        ...userData,
+        action: 'verify_email'
+      })
+      return result
+    } catch (error) {
+      console.error('Failed to verify email:', error)
+      throw error
+    }
+  },
+
+  async resendVerification(userData) {
+    try {
+      const result = await api.post('/bw-db-credentials.php', {
+        ...userData,
+        action: 'resend_verification'
+      })
+      return result
+    } catch (error) {
+      console.error('Failed to resend verification:', error)
+      throw error
+    }
+  },
+
+  async forgotPassword(userData) {
+    try {
+      const result = await api.post('/bw-db-credentials.php', {
+        ...userData,
+        action: 'forgot_password'
+      })
+      return result
+    } catch (error) {
+      console.error('Failed to process forgot password:', error)
+      throw error
+    }
+  },
+
+  async resetPassword(userData) {
+    try {
+      const result = await api.post('/bw-db-credentials.php', {
+        ...userData,
+        action: 'reset_password'
+      })
+      return result
+    } catch (error) {
+      console.error('Failed to reset password:', error)
+      throw error
     }
   }
 }
