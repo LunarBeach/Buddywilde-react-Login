@@ -337,8 +337,14 @@ const BuddyForm = () => {
       })
       
       if (loginResult.success) {
-        // Redirect to profile page
-        window.location.href = 'https://buddywilde.com/profile'
+        // REDIRECT COMMENTED OUT
+        // window.location.href = 'https://buddywilde.com/profile'
+        
+        // Optional: Show success message instead
+        setShowSuccessMessage('Login successful!')
+        setTimeout(() => {
+          setShowSuccessMessage('')
+        }, 3000)
       } else if (loginResult.email_not_verified) {
         // Email not verified - show verification state
         setVerificationEmail(formData.email)
@@ -376,8 +382,13 @@ const BuddyForm = () => {
       if (verifyResult.success) {
         setShowSuccessMessage('Email verified successfully!')
         setTimeout(() => {
-          // Redirect to profile page
-          window.location.href = 'https://buddywilde.com/profile'
+          // REDIRECT COMMENTED OUT
+          // window.location.href = 'https://buddywilde.com/profile'
+          
+          // Stay on current page or switch to login
+          setFormState('login')
+          setVerificationCode(['', '', '', '', '', ''])
+          setShowSuccessMessage('')
         }, 2000)
       } else {
         setErrors({ verification_code: verifyResult.error || 'Verification failed' })
