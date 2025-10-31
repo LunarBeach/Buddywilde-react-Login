@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import BuddyForm from './components/buddyForm'
 import './App.css'
 import BuddyHeader from './components/buddyHeader'
@@ -7,12 +7,51 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [currentUser, setCurrentUser] = useState(null)
 
+  // Check authentication status on app load
+  useEffect(() => {
+    const checkAuthStatus = () => {
+      const storedIsLoggedIn = localStorage.getItem('isLoggedIn')
+      const storedUser = localStorage.getItem('currentUser')
+      
+      if (storedIsLoggedIn === 'true' && storedUser) {
+        try {
+          const user = JSON.parse(storedUser)
+          setIsLoggedIn(true)
+          setCurrentUser(user)
+        } catch (error) {
+          console.error('Error parsing stored user data:', error)
+          // Clear invalid data
+          localStorage.removeItem('isLoggedIn')
+          localStorage.removeItem('currentUser')
+        }
+      }
+    }
+
+    checkAuthStatus()
+  }, [])
+
+  // Handle login success
+  const handleLoginSuccess = (userData) => {
+    setIsLoggedIn(true)
+    setCurrentUser(userData)
+    console.log('Login successful:', userData)
+  }
+
+  // Handle registration success
+  const handleRegistrationSuccess = (userData) => {
+    setIsLoggedIn(true)
+    setCurrentUser(userData)
+    console.log('Registration successful:', userData)
+  }
+
   // Handle logout
   const handleLogout = () => {
     // Clear authentication state
     setIsLoggedIn(false)
     setCurrentUser(null)
-    // For local development, just reset the form
+    // Clear localStorage
+    localStorage.removeItem('isLoggedIn')
+    localStorage.removeItem('currentUser')
     console.log('User logged out')
   }
 
@@ -29,16 +68,8 @@ function App() {
       />
       <div style={{ marginTop: '10vh' }}>
         <BuddyForm 
-          onLoginSuccess={(userData) => {
-            setIsLoggedIn(true)
-            setCurrentUser(userData)
-            console.log('Login successful:', userData)
-          }}
-          onRegistrationSuccess={(userData) => {
-            setIsLoggedIn(true)
-            setCurrentUser(userData)
-            console.log('Registration successful:', userData)
-          }}
+          onLoginSuccess={handleLoginSuccess}
+          onRegistrationSuccess={handleRegistrationSuccess}
         />
       </div>
     </div>

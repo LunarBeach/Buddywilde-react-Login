@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { userService } from '../services/userService'
 
-const BuddyForm = () => {
+const BuddyForm = ({ onLoginSuccess, onRegistrationSuccess }) => {
   const [formState, setFormState] = useState('register') // 'register', 'login', 'verify', 'forgot', 'reset'
   const [formData, setFormData] = useState({
     display_name: '',
@@ -336,9 +336,15 @@ const BuddyForm = () => {
         password: formData.password
       })
       
-      if (loginResult.success) {
-        // REDIRECT COMMENTED OUT
-        // window.location.href = 'https://buddywilde.com/profile'
+      if (loginResult.success && loginResult.user) {
+        // Store user data in localStorage for persistence
+        localStorage.setItem('isLoggedIn', 'true')
+        localStorage.setItem('currentUser', JSON.stringify(loginResult.user))
+        
+        // Call the success callback to update parent state
+        if (onLoginSuccess) {
+          onLoginSuccess(loginResult.user)
+        }
         
         // Optional: Show success message instead
         setShowSuccessMessage('Login successful!')
