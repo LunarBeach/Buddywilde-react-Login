@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
 import BuddyForm from './components/buddyForm/buddyForm'
 import './App.css'
 import BuddyHeader from './components/buddyHeader/buddyHeader'
@@ -56,7 +57,7 @@ function App() {
     console.log('User logged out')
   }
 
-  // Check if we're on the front page (for local dev)
+  // Check if we're on the front page
   const isFrontPage = window.location.pathname === '/' || window.location.pathname === '/'
 
   return (
@@ -68,13 +69,30 @@ function App() {
         isFrontPage={isFrontPage}
       />
       <div style={{ marginTop: '10vh' }}>
-        {!isLoggedIn && <BuddyForm 
-          onLoginSuccess={handleLoginSuccess}
-          onRegistrationSuccess={handleRegistrationSuccess}
-        />}
+        <Routes>
+          <Route path="/" element={
+            <>
+              {!isLoggedIn && <BuddyForm onLoginSuccess={handleLoginSuccess} onRegistrationSuccess={handleRegistrationSuccess} />}
+            </>
+          } />
+          <Route path="/contact" element={
+            <>
+              {!isLoggedIn && <BuddyForm onLoginSuccess={handleLoginSuccess} onRegistrationSuccess={handleRegistrationSuccess} />}
+              <ContactForm />
+            </>
+          } />
+        </Routes>
       </div>
     </div>
   )
 }
 
-export default App
+function AppWrapper() {
+  return (
+    <Router>
+      <App />
+    </Router>
+  )
+}
+
+export default AppWrapper
