@@ -87,7 +87,7 @@ const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
           ]
         },
         { label: 'PRESS', url: '/press-kit' },
-        { label: 'WIKI', url: '/cast' },
+        { label: 'WIKI', url: '/wiki' },
         { label: 'CONTACT', url: '/contact' },
         { label: 'Log out', url: '#', action: 'logout' }
       ];

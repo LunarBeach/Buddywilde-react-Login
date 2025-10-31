@@ -4,7 +4,7 @@ import BuddyForm from './components/buddyForm/buddyForm'
 import './App.css'
 import BuddyHeader from './components/buddyHeader/buddyHeader'
 import ContactForm from './components/buddyContact/buddyContact'
-
+import BuddyWiki from './components/buddyWiki/buddyWiki'
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [currentUser, setCurrentUser] = useState(null)
