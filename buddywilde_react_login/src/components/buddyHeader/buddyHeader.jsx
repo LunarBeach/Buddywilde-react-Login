@@ -87,7 +87,7 @@ const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
           ]
         },
         { label: 'PRESS', url: '/press-kit' },
-        { label: 'CAST', url: '/cast' },
+        { label: 'WIKI', url: '/cast' },
         { label: 'CONTACT', url: '/contact' },
         { label: 'Log out', url: '#', action: 'logout' }
       ];
@@ -377,7 +377,7 @@ const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
               width: '100%',
               backgroundColor: 'black',
               zIndex: 99998,
-              opacity: isMenuOpen ? 0.5 : 0,
+              opacity: isMenuOpen ? 1 : 0,
               transition: 'opacity 0.3s ease'
             }}
           >
@@ -392,6 +392,7 @@ const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
                   className={item.submenu ? 'bwh-has-submenu' : ''}
                   style={{
                     borderBottom: '1px solid rgba(255,255,255,1)',
+                    borderTop: '1px solid rgba(255,255,255,1)',
                     margin: 0,
                     position: 'relative'
                   }}
@@ -428,7 +429,8 @@ const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
                     }}>
                       {item.submenu.map((subItem, subIndex) => (
                         <li key={subIndex} style={{
-                          borderBottom: '1px solid rgba(255,255,255,1)'
+                          borderBottom: '1px solid rgba(255,255,255,1)',
+                          borderTop: '1px solid rgba(255,255,255,1)',
                         }}>
                           <a 
                             href={subItem.url} 
