@@ -5,6 +5,7 @@ import './App.css'
 import BuddyHeader from './components/buddyHeader/buddyHeader'
 import ContactForm from './components/buddyContact/buddyContact'
 import BuddyWiki from './components/buddyWiki/buddyWiki'
+
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [currentUser, setCurrentUser] = useState(null)
@@ -79,6 +80,12 @@ function App() {
             <>
               {!isLoggedIn && <BuddyForm onLoginSuccess={handleLoginSuccess} onRegistrationSuccess={handleRegistrationSuccess} />}
               <ContactForm />
+            </>
+          } />
+          <Route path="/wiki" element={
+            <>
+              {!isLoggedIn && <BuddyForm onLoginSuccess={handleLoginSuccess} onRegistrationSuccess={handleRegistrationSuccess} />}
+              <BuddyWiki />
             </>
           } />
         </Routes>
