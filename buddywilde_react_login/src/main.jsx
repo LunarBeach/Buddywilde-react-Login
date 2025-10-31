@@ -7,6 +7,6 @@ import App from './App.jsx';   // the login component we built earlier
 // The element with id="root" will be injected by WordPress
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+      <App />
   </StrictMode>
 );

@@ -68,10 +68,10 @@ function App() {
         isFrontPage={isFrontPage}
       />
       <div style={{ marginTop: '10vh' }}>
-        <BuddyForm 
+        {!isLoggedIn && <BuddyForm 
           onLoginSuccess={handleLoginSuccess}
           onRegistrationSuccess={handleRegistrationSuccess}
-        />
+        />}
       </div>
     </div>
   )
