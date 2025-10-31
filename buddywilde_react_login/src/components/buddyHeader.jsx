@@ -1,19 +1,47 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { userService } from '../services/userService'; // Add this import
 
 const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [openSubmenus, setOpenSubmenus] = useState({});
   const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
+  const [currentUser, setCurrentUser] = useState(user); // Local state for current user data
   const menuRef = useRef(null);
   const closeTimeoutRef = useRef(null);
 
   // Click sound audio element
   const clickSoundRef = useRef(null);
 
+  // Update local user state when prop changes
+  useEffect(() => {
+    setCurrentUser(user);
+  }, [user]);
+
+  // Fetch fresh user data when component mounts and user is logged in
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (isLoggedIn && user && user.email) {
+        try {
+          const userData = await userService.getUserData({ email: user.email });
+          if (userData && userData.user) {
+            setCurrentUser(userData.user);
+            // Also update localStorage with fresh data
+            localStorage.setItem('currentUser', JSON.stringify(userData.user));
+          }
+        } catch (error) {
+          console.error('Failed to fetch user data:', error);
+        }
+      }
+    };
+
+    fetchUserData();
+  }, [isLoggedIn, user]);
+
   // Log props for debugging
   useEffect(() => {
     console.log('Header props - isLoggedIn:', isLoggedIn, 'user:', user);
-  }, [isLoggedIn, user]);
+    console.log('Current user state:', currentUser);
+  }, [isLoggedIn, user, currentUser]);
 
   // Initialize audio
   useEffect(() => {
@@ -148,9 +176,9 @@ const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
   };
 
   // Get greeting name
-  const greetingName = isLoggedIn && user ? (user.display_name || 'there') : '';
-  const avatarUrl = isLoggedIn && user ? resolveAvatarUrl(user.avatar) : '';
-  const points = isLoggedIn && user ? (user.total_score || 0) : 0;
+  const greetingName = isLoggedIn && currentUser ? (currentUser.display_name || 'there') : '';
+  const avatarUrl = isLoggedIn && currentUser ? resolveAvatarUrl(currentUser.avatar) : '';
+  const points = isLoggedIn && currentUser ? (currentUser.total_score || 0) : 0;
 
   const menuItems = getMenuItems();
 
@@ -262,6 +290,10 @@ const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
                         borderRadius: '50%',
                         objectFit: 'cover',
                         marginRight: '1rem'
+                      }}
+                      onError={(e) => {
+                        // Fallback to default avatar on error
+                        e.target.src = 'https://buddywilde.com/wp-content/plugins/buddywilde-header/assets/buddy-default.png';
                       }}
                     />
                   )}

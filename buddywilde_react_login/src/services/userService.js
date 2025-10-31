@@ -90,5 +90,19 @@ export const userService = {
       console.error('Failed to reset password:', error)
       throw error
     }
+  },
+
+  // NEW: Fetch current user data from database
+  async getUserData(userData) {
+    try {
+      const result = await api.post('/bw-db-credentials.php', {
+        ...userData,
+        action: 'get_user_data'
+      })
+      return result
+    } catch (error) {
+      console.error('Failed to fetch user data:', error)
+      throw error
+    }
   }
 }
