@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { userService } from '../../services/userService'
-
+import './buddyForm.css'
 const BuddyForm = ({ onLoginSuccess, onRegistrationSuccess }) => {
   const [formState, setFormState] = useState('register') // 'register', 'login', 'verify', 'forgot', 'reset'
   const [formData, setFormData] = useState({
