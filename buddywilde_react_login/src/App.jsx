@@ -1,63 +1,23 @@
-// App.jsx
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import BuddyForm from './components/buddyForm'
+import './App.css'
 import BuddyHeader from './components/buddyHeader'
-import { userService } from './services/userService'
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [currentUser, setCurrentUser] = useState(null)
-  const [isLoading, setIsLoading] = useState(true) // Prevent flash
 
-  // Auto-login on mount
-  useEffect(() => {
-    const initAuth = async () => {
-      const savedUser = localStorage.getItem('buddy_user')
-      const token = localStorage.getItem('buddy_auth_token')
-
-      if (savedUser && token) {
-        try {
-          const user = JSON.parse(savedUser)
-          setCurrentUser(user)
-          setIsLoggedIn(true)
-        } catch {
-          // Invalid JSON
-        }
-      } else {
-        // Try to fetch from backend
-        const user = await userService.getCurrentUser()
-        if (user) {
-          setCurrentUser(user)
-          setIsLoggedIn(true)
-          localStorage.setItem('buddy_user', JSON.stringify(user))
-        }
-      }
-      setIsLoading(false)
-    }
-
-    initAuth()
-  }, [])
-
-  const handleLoginSuccess = (userData) => {
-    setIsLoggedIn(true)
-    setCurrentUser(userData)
-    localStorage.setItem('buddy_user', JSON.stringify(userData))
-    // Optional: save token if your backend uses it
-    // localStorage.setItem('buddy_auth_token', userData.token)
-  }
-
+  // Handle logout
   const handleLogout = () => {
+    // Clear authentication state
     setIsLoggedIn(false)
     setCurrentUser(null)
-    localStorage.removeItem('buddy_user')
-    localStorage.removeItem('buddy_auth_token')
+    // For local development, just reset the form
+    console.log('User logged out')
   }
 
-  const isFrontPage = window.location.pathname === '/'
-
-  if (isLoading) {
-    return <div>Loading...</div> // Or skeleton
-  }
+  // Check if we're on the front page (for local dev)
+  const isFrontPage = window.location.pathname === '/' || window.location.pathname === '/'
 
   return (
     <div className="app-container">
@@ -68,7 +28,18 @@ function App() {
         isFrontPage={isFrontPage}
       />
       <div style={{ marginTop: '10vh' }}>
-        <BuddyForm onLoginSuccess={handleLoginSuccess} />
+        <BuddyForm 
+          onLoginSuccess={(userData) => {
+            setIsLoggedIn(true)
+            setCurrentUser(userData)
+            console.log('Login successful:', userData)
+          }}
+          onRegistrationSuccess={(userData) => {
+            setIsLoggedIn(true)
+            setCurrentUser(userData)
+            console.log('Registration successful:', userData)
+          }}
+        />
       </div>
     </div>
   )
