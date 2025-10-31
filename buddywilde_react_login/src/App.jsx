@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import BuddyForm from './components/buddyForm'
+import BuddyForm from './components/buddyForm/buddyForm'
 import './App.css'
-import BuddyHeader from './components/buddyHeader'
+import BuddyHeader from './components/buddyHeader/buddyHeader'
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)

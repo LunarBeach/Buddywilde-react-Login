@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { userService } from '../services/userService'; // Add this import
+import { userService } from '../../services/userService'; // Add this import
 
 const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
