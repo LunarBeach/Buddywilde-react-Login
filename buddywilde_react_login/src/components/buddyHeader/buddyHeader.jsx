@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { userService } from '../../services/userService'; // Add this import
 
 const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -12,29 +11,14 @@ const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
   // Click sound audio element
   const clickSoundRef = useRef(null);
 
-  // Update local user state when prop changes
+  // Update local user state when isLoggedIn or user object changes
   useEffect(() => {
-    setCurrentUser(user);
-  }, [user]);
-
-  // Fetch fresh user data when component mounts and user is logged in
-  useEffect(() => {
-    const fetchUserData = async () => {
-      if (isLoggedIn && user && user.email) {
-        try {
-          const userData = await userService.getUserData({ email: user.email });
-          if (userData && userData.user) {
-            setCurrentUser(userData.user);
-            // Also update localStorage with fresh data
-            localStorage.setItem('currentUser', JSON.stringify(userData.user));
-          }
-        } catch (error) {
-          console.error('Failed to fetch user data:', error);
-        }
-      }
-    };
-
-    fetchUserData();
+    console.log('User/login state changed - isLoggedIn:', isLoggedIn, 'user:', user);
+    if (isLoggedIn && user) {
+      setCurrentUser(user);
+    } else if (!isLoggedIn) {
+      setCurrentUser(null);
+    }
   }, [isLoggedIn, user]);
 
   // Log props for debugging
@@ -175,10 +159,11 @@ const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
     }
   };
 
-  // Get greeting name
-  const greetingName = isLoggedIn && currentUser ? (currentUser.display_name || 'there') : '';
-  const avatarUrl = isLoggedIn && currentUser ? resolveAvatarUrl(currentUser.avatar) : '';
-  const points = isLoggedIn && currentUser ? (currentUser.total_score || 0) : 0;
+  // Get greeting name - use user prop directly to avoid timing issues with state updates
+  const displayUser = user || currentUser;
+  const greetingName = isLoggedIn && displayUser ? (displayUser.display_name || 'there') : '';
+  const avatarUrl = isLoggedIn && displayUser ? resolveAvatarUrl(displayUser.avatar) : '';
+  const points = isLoggedIn && displayUser ? (displayUser.total_score || 0) : 0;
 
   const menuItems = getMenuItems();
 
@@ -273,7 +258,7 @@ const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
               alignItems: 'center',
               paddingLeft: '1.5rem'
             }}>
-              {isLoggedIn && !isFrontPage && (
+              {isLoggedIn && (
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
