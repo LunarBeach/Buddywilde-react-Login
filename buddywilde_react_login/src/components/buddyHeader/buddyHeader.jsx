@@ -87,19 +87,30 @@ const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
 
   // Resolve avatar URL
   const resolveAvatarUrl = (avatarVal) => {
-    if (typeof avatarVal === 'string' && /^https?:\/\//i.test(avatarVal)) {
-      return avatarVal;
+    // Default to buddy-default.png if no value
+    let filename = avatarVal;
+    if (!filename) {
+      filename = 'buddy-default.png';
     }
-    if (!avatarVal || avatarVal === 'buddy') {
-      return 'https://buddywilde.com/wp-content/plugins/buddywilde-header/assets/buddy-default.png';
+
+    // If already a full URL, return as-is
+    if (typeof filename === 'string' && /^https?:\/\//i.test(filename)) {
+      return filename;
     }
-    // Assuming WordPress uploads structure
-    if (avatarVal && avatarVal.includes('/')) {
-      return `https://buddywilde.com/wp-content/uploads/${avatarVal}`;
-    } else if (avatarVal) {
-      return `https://buddywilde.com/wp-content/uploads/avatars/${avatarVal}`;
+
+    // Handle legacy 'buddy' value
+    if (filename === 'buddy') {
+      filename = 'buddy-default.png';
     }
-    return 'https://buddywilde.com/wp-content/plugins/buddywilde-header/assets/buddy-default.png';
+
+    // Extract just the filename if it's a full path
+    if (filename.includes('/')) {
+      const parts = filename.split('/');
+      filename = parts[parts.length - 1];
+    }
+
+    // All avatars (including default) are in the theme assets folder
+    return `https://buddywilde.com/wp-content/themes/buddy_wilde_theme/assets/avatars/${filename}`;
   };
 
   // Play click sound

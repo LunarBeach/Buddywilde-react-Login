@@ -5,6 +5,7 @@ import './App.css'
 import BuddyHeader from './components/buddyHeader/buddyHeader'
 import ContactForm from './components/buddyContact/buddyContact'
 import BuddyWiki from './components/buddyWiki/buddyWiki'
+import BuddyEditProfile from './components/buddyEditProfile/buddyEditProfile'
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -58,6 +59,13 @@ function App() {
     console.log('User logged out')
   }
 
+  // Handle profile update
+  const handleProfileUpdate = (updatedUser) => {
+    setCurrentUser(updatedUser)
+    localStorage.setItem('currentUser', JSON.stringify(updatedUser))
+    console.log('Profile updated:', updatedUser)
+  }
+
   // Check if we're on the front page
   const isFrontPage = window.location.pathname === '/' || window.location.pathname === '/'
 
@@ -86,6 +94,15 @@ function App() {
             <>
               {!isLoggedIn && <BuddyForm onLoginSuccess={handleLoginSuccess} onRegistrationSuccess={handleRegistrationSuccess} />}
               <BuddyWiki />
+            </>
+          } />
+          <Route path="/profile" element={
+            <>
+              {!isLoggedIn ? (
+                <BuddyForm onLoginSuccess={handleLoginSuccess} onRegistrationSuccess={handleRegistrationSuccess} />
+              ) : (
+                <BuddyEditProfile user={currentUser} onProfileUpdate={handleProfileUpdate} />
+              )}
             </>
           } />
         </Routes>
