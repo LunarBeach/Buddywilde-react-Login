@@ -5,6 +5,13 @@
   text-align: center;
 }
 
+/* Full width for game pages */
+#root:has(.star-bonk-container) {
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
 .app-container {
   position: relative;
   z-index: 1;

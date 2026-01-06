@@ -1,0 +1,350 @@
+@font-face {
+  font-family: 'Nodo';
+  src: url('https://buddywilde.com/wp-content/uploads/2025/10/Nodo.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+.star-bonk-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  overflow: hidden;
+  font-family: 'Nodo', Arial, sans-serif;
+  z-index: 1000;
+}
+
+.background-video {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  min-width: 100%;
+  min-height: 100%;
+  width: auto;
+  height: auto;
+  transform: translate(-50%, -50%);
+  object-fit: cover;
+  opacity: 0.2;
+  z-index: 0;
+}
+
+/* Menu Styles */
+.game-menu {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 3rem;
+  border-radius: 15px;
+  backdrop-filter: blur(10px);
+}
+
+.game-title {
+  font-family: 'Nodo', Arial, sans-serif;
+  font-size: clamp(3rem, 8vw, 6rem);
+  color: #fff;
+  margin-bottom: 2rem;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+}
+
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 300px;
+}
+
+.menu-button {
+  font-family: 'Nodo', Arial, sans-serif;
+  font-size: 1.5rem;
+  padding: 1rem 2rem;
+  background: rgba(40, 180, 20, 0.85);
+  color: white;
+  border: 2px solid rgba(57, 255, 20, 0.7);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+.menu-button:hover {
+  background: rgba(40, 180, 20, 1);
+  transform: translateY(-2px);
+  border-color: rgba(57, 255, 20, 0.9);
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(57, 255, 20, 0.6),
+                0 0 20px rgba(57, 255, 20, 0.4),
+                0 0 30px rgba(57, 255, 20, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(57, 255, 20, 0.8),
+                0 0 30px rgba(57, 255, 20, 0.6),
+                0 0 40px rgba(57, 255, 20, 0.4);
+  }
+}
+
+/* Challenge List Styles */
+.challenge-list {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.85);
+  padding: 2rem;
+  border-radius: 15px;
+  backdrop-filter: blur(10px);
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.section-title {
+  font-family: 'Nodo', Arial, sans-serif;
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  color: #fff;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.challenges-ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 2rem 0;
+}
+
+.challenges-ul li {
+  margin-bottom: 1rem;
+}
+
+.challenge-button {
+  font-family: 'Nodo', Arial, sans-serif;
+  width: 100%;
+  padding: 1rem;
+  background: rgba(100, 108, 255, 0.8);
+  color: white;
+  border: 2px solid rgba(100, 108, 255, 0.9);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 1.1rem;
+}
+
+.challenge-button:hover {
+  background: rgba(100, 108, 255, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(100, 108, 255, 0.4);
+}
+
+.no-challenges {
+  font-family: 'Nodo', Arial, sans-serif;
+  color: rgba(255, 255, 255, 0.7);
+  text-align: center;
+  font-size: 1.2rem;
+  margin: 2rem 0;
+}
+
+.back-button {
+  font-family: 'Nodo', Arial, sans-serif;
+  padding: 0.75rem 2rem;
+  background: rgba(200, 200, 200, 0.3);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 1.1rem;
+  display: block;
+  margin: 0 auto;
+}
+
+.back-button:hover {
+  background: rgba(200, 200, 200, 0.5);
+  border-color: rgba(255, 255, 255, 0.8);
+}
+
+/* Rules Styles */
+.rules-popup {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.85);
+  padding: 2rem;
+  border-radius: 15px;
+  backdrop-filter: blur(10px);
+  max-width: 600px;
+  width: 90%;
+}
+
+.rules-content {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.1rem;
+  line-height: 1.8;
+  margin-bottom: 2rem;
+}
+
+.rules-content p {
+  margin: 0.75rem 0;
+}
+
+/* Game HUD */
+.game-hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 10vh;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0 2rem;
+  box-sizing: border-box;
+}
+
+.score {
+  font-family: 'Nodo', Arial, sans-serif;
+  font-size: clamp(1.5rem, 4vw, 3rem);
+  color: white;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.left-score {
+  text-align: left;
+  justify-self: start;
+}
+
+.right-score {
+  text-align: right;
+  justify-self: end;
+}
+
+.exit-button,
+.fullscreen-button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: clamp(1.5em, 3vw, 2em);
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.exit-button:hover,
+.fullscreen-button:hover {
+  transform: scale(1.1);
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+}
+
+.exit-button {
+  justify-self: center;
+}
+
+/* Game Play Window */
+.game-play-window {
+  position: absolute;
+  top: 10vh;
+  left: 0;
+  width: 100%;
+  height: 90vh;
+  z-index: 1;
+}
+
+.game-play-window canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Game Over */
+.game-over {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Nodo', Arial, sans-serif;
+  font-size: clamp(3rem, 8vw, 6rem);
+  color: white;
+  text-align: center;
+  z-index: 20;
+  text-shadow: 0 0 30px rgba(255, 255, 255, 0.8);
+  animation: gameOverPulse 1s ease-in-out infinite;
+}
+
+@keyframes gameOverPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .game-menu,
+  .challenge-list,
+  .rules-popup {
+    width: 95%;
+    padding: 1.5rem;
+  }
+
+  .game-title {
+    font-size: clamp(2rem, 10vw, 4rem);
+  }
+
+  .menu-buttons {
+    min-width: auto;
+    gap: 1rem;
+  }
+
+  .menu-button {
+    font-size: 1.2rem;
+    padding: 0.75rem 1.5rem;
+  }
+
+  .game-hud {
+    padding: 0 1rem;
+  }
+
+  .score {
+    font-size: clamp(1.5rem, 6vw, 3rem);
+  }
+}
+
+/* Landscape mobile optimization */
+@media (max-width: 1024px) and (orientation: landscape) {
+  .game-hud {
+    height: 8vh;
+  }
+
+  .game-play-window {
+    top: 8vh;
+    height: 92vh;
+  }
+
+  .exit-button {
+    top: 10px;
+    font-size: 1.5em;
+  }
+
+  .fullscreen-button {
+    top: 10px;
+    font-size: 1.5em;
+  }
+}

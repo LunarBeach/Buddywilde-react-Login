@@ -7,6 +7,7 @@ import ContactForm from './components/buddyContact/buddyContact'
 import BuddyWiki from './components/buddyWiki/buddyWiki'
 import BuddyEditProfile from './components/buddyEditProfile/buddyEditProfile'
 import BuddyVideoBackground from './components/buddyVideoBackground/buddyVideoBackground'
+import BuddyStarBonk from './components/buddyStarBonk/buddyStarBonk'
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -68,20 +69,94 @@ function App() {
     console.log('Profile updated:', updatedUser)
   }
 
+  // Refresh user data from database
+  const refreshUserData = async () => {
+    if (!currentUser?.email) return;
+
+    try {
+      console.log('Refreshing user data from database...');
+      const response = await fetch('https://buddywilde.com/wp-content/themes/buddy_wilde_theme/bw-db-credentials.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'get_user_data',
+          email: currentUser.email
+        })
+      });
+      const data = await response.json();
+      console.log('User data refresh response:', data);
+
+      if (data.success && data.user) {
+        setCurrentUser(data.user);
+        localStorage.setItem('currentUser', JSON.stringify(data.user));
+        console.log('User data refreshed successfully:', data.user);
+      }
+    } catch (error) {
+      console.error('Error refreshing user data:', error);
+    }
+  }
+
   // Check if we're on the front page
   const isFrontPage = location.pathname === '/'
+  const isGamePage = location.pathname === '/star-bonk'
 
+  // Debug logging
+  useEffect(() => {
+    console.log('=== APP.JSX DEBUG ===');
+    console.log('Current pathname:', JSON.stringify(location.pathname));
+    console.log('Pathname length:', location.pathname.length);
+    console.log('isFrontPage:', isFrontPage);
+    console.log('isGamePage:', isGamePage);
+    console.log('Pathname === "/star-bonk":', location.pathname === '/star-bonk');
+    console.log('Should render BuddyVideoBackground:', isFrontPage);
+    console.log('Should render BuddyHeader:', !isGamePage);
+  }, [location.pathname, isFrontPage, isGamePage]);
+
+  // Refresh user data when returning from game page
+  useEffect(() => {
+    // If we just left the game page (pathname changed from /star-bonk to something else)
+    if (!isGamePage && location.pathname !== '/star-bonk') {
+      // Small delay to ensure any pending API calls complete
+      const timer = setTimeout(() => {
+        refreshUserData();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [location.pathname, isGamePage]);
+
+  // If on game page, render ONLY the game, nothing else
+  if (isGamePage) {
+    console.log('!!! GAME PAGE DETECTED - RENDERING ONLY GAME !!!');
+    console.log('!!! NO VIDEO BACKGROUND, NO HEADER !!!');
+    return (
+      <div className="app-container">
+        <BuddyStarBonk
+          user={currentUser}
+          isLoggedIn={isLoggedIn}
+          onScoreSubmitted={refreshUserData}
+        />
+      </div>
+    );
+  }
+
+  console.log('!!! NORMAL PAGE BRANCH - NOT GAME PAGE !!!');
+
+  // Otherwise render normal pages with header and optional video background
   return (
     <div className="app-container">
       {/* Show video background only on front page */}
       {isFrontPage && <BuddyVideoBackground />}
 
+      {/* Show header for all pages except game pages */}
       <BuddyHeader
         isLoggedIn={isLoggedIn}
         user={currentUser}
         onLogout={handleLogout}
         isFrontPage={isFrontPage}
       />
+
       <div style={{ marginTop: '10vh' }}>
         <Routes>
           <Route path="/" element={

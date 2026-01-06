@@ -7,6 +7,14 @@ const BuddyVideoBackground = () => {
   const [previousVideoIndex, setPreviousVideoIndex] = useState(null);
   const videoRef = useRef(null);
 
+  // Debug: Log when component mounts
+  useEffect(() => {
+    console.log('!!! BuddyVideoBackground MOUNTED - This should ONLY happen on front page !!!');
+    return () => {
+      console.log('!!! BuddyVideoBackground UNMOUNTED !!!');
+    };
+  }, []);
+
   // Fetch list of videos from the server
   useEffect(() => {
     const fetchVideos = async () => {
@@ -33,7 +41,7 @@ const BuddyVideoBackground = () => {
           const randomIndex = Math.floor(Math.random() * data.videos.length);
           console.log('Starting with video index:', randomIndex, 'filename:', data.videos[randomIndex]);
           setCurrentVideoIndex(randomIndex);
-          setPreviousVideoIndex(randomIndex);
+          // Don't set previousVideoIndex here - leave it as null so first transition has all videos available
         } else {
           console.error('No videos found or invalid response:', data);
         }
@@ -47,25 +55,38 @@ const BuddyVideoBackground = () => {
 
   // Handle video end - select next random video
   const handleVideoEnd = () => {
-    if (videos.length === 0) return;
+    console.log('=== VIDEO ENDED ===');
+    console.log('Current video index:', currentVideoIndex);
+    console.log('Previous video index:', previousVideoIndex);
+    console.log('Total videos:', videos.length);
+
+    if (videos.length === 0) {
+      console.error('No videos available!');
+      return;
+    }
 
     let nextIndex;
 
     if (videos.length === 1) {
       // Only one video, replay it
       nextIndex = 0;
+      console.log('Only one video - replaying index 0');
     } else {
-      // Pick a random video excluding the previous one
+      // Pick a random video excluding the current one (not previous, but current!)
       const availableIndices = videos
         .map((_, index) => index)
-        .filter(index => index !== previousVideoIndex);
+        .filter(index => index !== currentVideoIndex);
+
+      console.log('Available indices (excluding current):', availableIndices);
 
       const randomSelection = Math.floor(Math.random() * availableIndices.length);
       nextIndex = availableIndices[randomSelection];
+      console.log('Selected next video index:', nextIndex, 'filename:', videos[nextIndex]);
     }
 
     setPreviousVideoIndex(currentVideoIndex);
     setCurrentVideoIndex(nextIndex);
+    console.log('Updated: previousVideoIndex will be', currentVideoIndex, ', currentVideoIndex will be', nextIndex);
   };
 
   // Ensure video plays when changed

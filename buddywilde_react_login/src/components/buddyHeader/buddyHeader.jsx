@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 
 const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -393,27 +394,44 @@ const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
                     position: 'relative'
                   }}
                 >
-                  <a 
-                    href={item.url === '#' ? '#' : item.url}
-                    className="bwh-menu-item"
-                    style={{
-                      display: 'block',
-                      padding: '1rem 1.5rem',
-                      color: 'white',
-                      textDecoration: 'none',
-                      fontFamily: 'Nodo, Arial, sans-serif',
-                      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                      position: 'relative'
-                    }}
-                    onClick={(e) => {
-                      if (item.url === '#' || item.action) {
+                  {item.url === '#' || item.action ? (
+                    <a
+                      href="#"
+                      className="bwh-menu-item"
+                      style={{
+                        display: 'block',
+                        padding: '1rem 1.5rem',
+                        color: 'white',
+                        textDecoration: 'none',
+                        fontFamily: 'Nodo, Arial, sans-serif',
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        position: 'relative'
+                      }}
+                      onClick={(e) => {
                         e.preventDefault();
-                      }
-                      handleMenuItemClick(item);
-                    }}
-                  >
-                    {item.label}
-                  </a>
+                        handleMenuItemClick(item);
+                      }}
+                    >
+                      {item.label}
+                    </a>
+                  ) : (
+                    <Link
+                      to={item.url}
+                      className="bwh-menu-item"
+                      style={{
+                        display: 'block',
+                        padding: '1rem 1.5rem',
+                        color: 'white',
+                        textDecoration: 'none',
+                        fontFamily: 'Nodo, Arial, sans-serif',
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        position: 'relative'
+                      }}
+                      onClick={() => handleMenuItemClick(item)}
+                    >
+                      {item.label}
+                    </Link>
+                  )}
                   
                   {item.submenu && (
                     <ul className={`sub-menu ${openSubmenus[item.label] ? 'open' : ''}`} style={{
@@ -428,8 +446,8 @@ const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
                           borderBottom: '1px solid rgba(255,255,255,1)',
                           borderTop: '1px solid rgba(255,255,255,1)',
                         }}>
-                          <a 
-                            href={subItem.url} 
+                          <Link
+                            to={subItem.url}
                             className="bwh-menu-item"
                             style={{
                               display: 'block',
@@ -441,10 +459,14 @@ const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
                               position: 'relative',
                               fontSize: '0.9rem'
                             }}
-                            onClick={playClickSound}
+                            onClick={() => {
+                              playClickSound();
+                              setIsMenuOpen(false);
+                              setOpenSubmenus({});
+                            }}
                           >
                             {subItem.label}
-                          </a>
+                          </Link>
                         </li>
                       ))}
                     </ul>
