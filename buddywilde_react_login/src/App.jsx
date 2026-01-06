@@ -6,17 +6,19 @@ import BuddyHeader from './components/buddyHeader/buddyHeader'
 import ContactForm from './components/buddyContact/buddyContact'
 import BuddyWiki from './components/buddyWiki/buddyWiki'
 import BuddyEditProfile from './components/buddyEditProfile/buddyEditProfile'
+import BuddyVideoBackground from './components/buddyVideoBackground/buddyVideoBackground'
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [currentUser, setCurrentUser] = useState(null)
+  const location = useLocation()
 
   // Check authentication status on app load
   useEffect(() => {
     const checkAuthStatus = () => {
       const storedIsLoggedIn = localStorage.getItem('isLoggedIn')
       const storedUser = localStorage.getItem('currentUser')
-      
+
       if (storedIsLoggedIn === 'true' && storedUser) {
         try {
           const user = JSON.parse(storedUser)
@@ -67,11 +69,14 @@ function App() {
   }
 
   // Check if we're on the front page
-  const isFrontPage = window.location.pathname === '/' || window.location.pathname === '/'
+  const isFrontPage = location.pathname === '/'
 
   return (
     <div className="app-container">
-      <BuddyHeader 
+      {/* Show video background only on front page */}
+      {isFrontPage && <BuddyVideoBackground />}
+
+      <BuddyHeader
         isLoggedIn={isLoggedIn}
         user={currentUser}
         onLogout={handleLogout}

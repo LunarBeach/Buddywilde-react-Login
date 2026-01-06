@@ -1,0 +1,202 @@
+@font-face {
+  font-family: 'Nodo';
+  src: url('https://buddywilde.com/wp-content/uploads/2025/10/Nodo.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+.form-content {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 2rem;
+  background: transparent;
+  position: relative;
+  z-index: 2;
+}
+
+.form-content h2 {
+  font-family: 'Nodo', Arial, sans-serif;
+  color: #ffffff;
+  font-size: clamp(1.8rem, 4vw, 2.5rem);
+  margin-bottom: 1.5rem;
+  text-align: center;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.auth-form {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+  text-align: left;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: rgba(100, 108, 255, 0.6);
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 0 3px rgba(100, 108, 255, 0.1);
+}
+
+.form-group input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.form-group input.error {
+  border-color: rgba(255, 100, 100, 0.6);
+  background: rgba(255, 100, 100, 0.1);
+}
+
+.error-message {
+  display: block;
+  margin-top: 0.5rem;
+  color: #ff6b6b;
+  font-size: 0.875rem;
+}
+
+.error-message.general {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: rgba(255, 100, 100, 0.2);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 100, 100, 0.4);
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(57, 255, 20, 0.6),
+                0 0 20px rgba(57, 255, 20, 0.4),
+                0 0 30px rgba(57, 255, 20, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(57, 255, 20, 0.8),
+                0 0 30px rgba(57, 255, 20, 0.6),
+                0 0 40px rgba(57, 255, 20, 0.4);
+  }
+}
+
+.submit-btn {
+  width: 100%;
+  padding: 0.875rem;
+  background: rgba(40, 180, 20, 0.85);
+  color: white;
+  border: 2px solid rgba(57, 255, 20, 0.7);
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 0.5rem;
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+.submit-btn:hover:not(:disabled) {
+  background: rgba(40, 180, 20, 1);
+  transform: translateY(-1px);
+  border-color: rgba(57, 255, 20, 0.9);
+}
+
+.submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  animation: none;
+}
+
+.form-footer {
+  margin-top: 1.5rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.9rem;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: rgba(100, 108, 255, 0.9);
+  cursor: pointer;
+  font-size: 0.9rem;
+  text-decoration: underline;
+  padding: 0.25rem;
+  margin: 0 0.25rem;
+  transition: color 0.2s ease;
+}
+
+.link-btn:hover {
+  color: rgba(100, 108, 255, 1);
+}
+
+/* Verification code styles */
+.verification-instructions {
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 1.5rem;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.verification-code-container {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.verification-digit {
+  width: 3rem;
+  height: 3.5rem;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 600;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  transition: all 0.3s ease;
+}
+
+.verification-digit:focus {
+  outline: none;
+  border-color: rgba(100, 108, 255, 0.6);
+  background: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 0 3px rgba(100, 108, 255, 0.1);
+}
+
+.verification-digit.error {
+  border-color: rgba(255, 100, 100, 0.6);
+  background: rgba(255, 100, 100, 0.1);
+}
+
+/* Success message */
+.success-message {
+  padding: 0.75rem;
+  background: rgba(100, 255, 100, 0.2);
+  border: 1px solid rgba(100, 255, 100, 0.4);
+  border-radius: 6px;
+  color: #4ade80;
+  margin-bottom: 1rem;
+  text-align: center;
+}
