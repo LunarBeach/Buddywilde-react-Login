@@ -11,6 +11,8 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
   const STATE_CHALLENGE_LIST = 'challenge_list';
   const STATE_RULES = 'rules';
   const STATE_WAITING_FOR_OPPONENT = 'waiting_for_opponent';
+  const STATE_PRE_GAME_RULES = 'pre_game_rules';
+  const STATE_OPPONENT_CANCELLED = 'opponent_cancelled';
 
   // State management
   const [currentState, setCurrentState] = useState(STATE_MENU);
@@ -23,7 +25,12 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
   const [level, setLevel] = useState(1);
   const [gameOver, setGameOver] = useState(false);
   const [gameOverMessage, setGameOverMessage] = useState('');
+  const [isWinner, setIsWinner] = useState(false);
   const [showingIntro, setShowingIntro] = useState(false);
+  const [playerReady, setPlayerReady] = useState(false);
+  const [opponentReady, setOpponentReady] = useState(false);
+  const [opponentName, setOpponentName] = useState(null);
+  const [opponentAvatar, setOpponentAvatar] = useState(null);
 
   // Debug logging
   useEffect(() => {
@@ -46,21 +53,166 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
     }
   }, [isLoggedIn, user, navigate]);
 
-  // Play waiting sound when in waiting state
+  // Play waiting sound when in waiting state with timed intervals
   useEffect(() => {
-    if (currentState === STATE_WAITING_FOR_OPPONENT) {
-      console.log('Entering waiting state - playing waiting sound');
-      audioRefs.current.waitingSound.loop = true;
-      audioRefs.current.waitingSound.volume = 0.7;
-      audioRefs.current.waitingSound.play().catch(e => console.log('Waiting sound play failed:', e));
-    } else {
-      // Stop waiting sound when leaving waiting state
-      if (audioRefs.current.waitingSound) {
+    let firstTimeout;
+    let intervalId;
+
+    if (currentState === STATE_WAITING_FOR_OPPONENT && audioRefs.current?.waitingSound) {
+      console.log('Entering waiting state - scheduling waiting sound');
+
+      // Play first time after 10 seconds
+      firstTimeout = setTimeout(() => {
+        console.log('Playing waiting sound (first time after 10s)');
+        if (audioRefs.current?.waitingSound) {
+          audioRefs.current.waitingSound.volume = 0.7;
+          audioRefs.current.waitingSound.play().catch(e => console.log('Waiting sound play failed:', e));
+        }
+
+        // Then play every 30 seconds after that
+        intervalId = setInterval(() => {
+          console.log('Playing waiting sound (repeated every 30s)');
+          if (audioRefs.current?.waitingSound) {
+            audioRefs.current.waitingSound.currentTime = 0;
+            audioRefs.current.waitingSound.play().catch(e => console.log('Waiting sound play failed:', e));
+          }
+        }, 30000);
+      }, 10000);
+    }
+
+    // Cleanup function
+    return () => {
+      if (firstTimeout) clearTimeout(firstTimeout);
+      if (intervalId) clearInterval(intervalId);
+      if (audioRefs.current?.waitingSound) {
         audioRefs.current.waitingSound.pause();
         audioRefs.current.waitingSound.currentTime = 0;
       }
-    }
+    };
   }, [currentState]);
+
+  // Play background sound during menu states and gameplay, but NOT during intro
+  useEffect(() => {
+    if (!audioRefs.current?.background) return;
+
+    const isMenuState = currentState === STATE_MENU ||
+                        currentState === STATE_CHALLENGE_LIST ||
+                        currentState === STATE_RULES ||
+                        currentState === STATE_WAITING_FOR_OPPONENT ||
+                        currentState === STATE_PRE_GAME_RULES ||
+                        currentState === STATE_OPPONENT_CANCELLED;
+
+    // Play background sound in menu states or during gameplay, but stop during intro
+    if (isMenuState && !showingIntro) {
+      console.log('Playing background sound for menu state');
+      audioRefs.current.background.volume = 0.5;
+      audioRefs.current.background.play().catch(e => console.log('Background sound play failed:', e));
+    } else if (showingIntro || (currentState !== STATE_PLAYING && !isMenuState)) {
+      // Pause background sound during intro or when in non-menu/non-playing states
+      console.log('Pausing background sound');
+      audioRefs.current.background.pause();
+    }
+  }, [currentState, showingIntro]);
+
+  // Check if both players are ready in multiplayer mode
+  useEffect(() => {
+    if (currentState === STATE_PRE_GAME_RULES && gameMode === 'challenge' && playerReady && opponentReady) {
+      console.log('Both players ready - starting intro cutscene');
+      startGameIntro();
+    }
+  }, [playerReady, opponentReady, currentState, gameMode]);
+
+  // Play winner/loser sound every 3 seconds when game is over
+  useEffect(() => {
+    let intervalId;
+
+    if (gameOver && audioRefs.current) {
+      const soundToPlay = isWinner ? audioRefs.current.winnerSound : audioRefs.current.loserSound;
+
+      // Play immediately
+      soundToPlay.currentTime = 0;
+      soundToPlay.play().catch(e => console.log('Game over sound play failed:', e));
+
+      // Then play every 3 seconds
+      intervalId = setInterval(() => {
+        soundToPlay.currentTime = 0;
+        soundToPlay.play().catch(e => console.log('Game over sound play failed:', e));
+      }, 3000);
+    }
+
+    // Cleanup
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      if (audioRefs.current?.loserSound) {
+        audioRefs.current.loserSound.pause();
+        audioRefs.current.loserSound.currentTime = 0;
+      }
+      if (audioRefs.current?.winnerSound) {
+        audioRefs.current.winnerSound.pause();
+        audioRefs.current.winnerSound.currentTime = 0;
+      }
+    };
+  }, [gameOver, isWinner]);
+
+  // Poll for challenge acceptance when waiting for opponent
+  useEffect(() => {
+    let pollInterval;
+
+    if (currentState === STATE_WAITING_FOR_OPPONENT && challengeId) {
+      console.log('Starting to poll for challenge acceptance...');
+
+      const checkChallengeStatus = async () => {
+        try {
+          const response = await fetch('https://buddywilde.com/wp-content/themes/buddy_wilde_theme/bw-db-credentials.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              action: 'check_challenge_status',
+              challenge_id: challengeId
+            })
+          });
+
+          const data = await response.json();
+          console.log('Challenge status:', data);
+
+          if (data.success && data.status === 'active') {
+            // Challenge has been accepted!
+            console.log('Challenge accepted! Moving to pre-game rules');
+            clearInterval(pollInterval);
+            // Store opponent info (the person who accepted)
+            if (data.opponent_name) {
+              setOpponentName(data.opponent_name);
+              setOpponentAvatar(data.opponent_avatar);
+            }
+            // Set to human vs human mode
+            gameVars.current.HUMAN_VS_COMPUTER = false;
+            setCurrentState(STATE_PRE_GAME_RULES);
+          } else if (data.success && data.status === 'cancelled') {
+            // Challenge was cancelled by opponent
+            console.log('Challenge was cancelled');
+            clearInterval(pollInterval);
+            setCurrentState(STATE_OPPONENT_CANCELLED);
+          }
+        } catch (error) {
+          console.error('Error checking challenge status:', error);
+        }
+      };
+
+      // Check immediately
+      checkChallengeStatus();
+
+      // Then check every 2 seconds
+      pollInterval = setInterval(checkChallengeStatus, 2000);
+    }
+
+    // Cleanup
+    return () => {
+      if (pollInterval) {
+        console.log('Stopping challenge status polling');
+        clearInterval(pollInterval);
+      }
+    };
+  }, [currentState, challengeId]);
 
   // Initialize game when entering PLAYING state
   useEffect(() => {
@@ -95,9 +247,24 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
         }
         requestAnimationFrame(fadeIn);
 
-        // Start background sound
-        audioRefs.current.background.volume = 0.5;
+        // Start background sound with 0.1 second fade-in
+        audioRefs.current.background.volume = 0;
         audioRefs.current.background.play().catch(e => console.log('Background sound play failed:', e));
+
+        // Fade in background audio over 0.1 seconds
+        let bgFadeStart = performance.now();
+        const BG_FADE_DURATION = 300; // 0.1 seconds in milliseconds
+        const TARGET_VOLUME = 0.5;
+        function fadeInBackground() {
+          let progress = (performance.now() - bgFadeStart) / BG_FADE_DURATION;
+          audioRefs.current.background.volume = Math.min(TARGET_VOLUME, TARGET_VOLUME * progress);
+          if (progress < 1) {
+            requestAnimationFrame(fadeInBackground);
+          } else {
+            audioRefs.current.background.volume = TARGET_VOLUME;
+          }
+        }
+        requestAnimationFrame(fadeInBackground);
 
         gv.gameRunning = true;
         gameLoopRef.current = requestAnimationFrame(gameLoop);
@@ -198,22 +365,30 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
 
   // Initialize audio on component mount
   useEffect(() => {
-    audioRefs.current = {
-      paddleStrike: new Audio(`${ASSET_BASE}/gronk_bonk_paddle_strike.wav`),
-      start: new Audio(`${ASSET_BASE}/rocket_sound.wav`),
-      background: new Audio(`${ASSET_BASE}/deepspace_gronk_bonk.wav`),
-      doubleBonk: new Audio(`${ASSET_BASE}/double_BONK.wav`),
-      tripleBonk: new Audio(`${ASSET_BASE}/triple_BONK.wav`),
-      streak1: new Audio(`${ASSET_BASE}/great_bonking_GRONK.wav`),
-      streak2: new Audio(`${ASSET_BASE}/ur_a_true_HERO.wav`),
-      streak3: new Audio(`${ASSET_BASE}/WOW.wav`),
-      loseStreak2: new Audio(`${ASSET_BASE}/bonk_more_STARS.wav`),
-      loseStreak4: new Audio(`${ASSET_BASE}/BONK_STARS_BETTER.wav`),
-      rocketSound: new Audio(`${ASSET_BASE}/rocket_sound.wav`),
-      waitingSound: new Audio(`${ASSET_BASE}/we need_to_get_bonking.wav`)
-    };
+    console.log('Initializing audio refs...');
+    try {
+      audioRefs.current = {
+        paddleStrike: new Audio(`${ASSET_BASE}/gronk_bonk_paddle_strike.wav`),
+        start: new Audio(`${ASSET_BASE}/rocket_sound.wav`),
+        background: new Audio(`${ASSET_BASE}/deepspace_gronk_bonk.wav`),
+        doubleBonk: new Audio(`${ASSET_BASE}/double_BONK.wav`),
+        tripleBonk: new Audio(`${ASSET_BASE}/triple_BONK.wav`),
+        streak1: new Audio(`${ASSET_BASE}/great_bonking_GRONK.wav`),
+        streak2: new Audio(`${ASSET_BASE}/ur_a_true_HERO.wav`),
+        streak3: new Audio(`${ASSET_BASE}/WOW.wav`),
+        loseStreak2: new Audio(`${ASSET_BASE}/bonk_more_STARS.wav`),
+        loseStreak4: new Audio(`${ASSET_BASE}/BONK_STARS_BETTER.wav`),
+        rocketSound: new Audio(`${ASSET_BASE}/rocket_sound.wav`),
+        waitingSound: new Audio(`${ASSET_BASE}/we%20need_to_get_bonking.wav`),
+        loserSound: new Audio(`${ASSET_BASE}/LOSER.wav`),
+        winnerSound: new Audio(`${ASSET_BASE}/ur_a_true_HERO.wav`)
+      };
 
-    audioRefs.current.background.loop = true;
+      audioRefs.current.background.loop = true;
+      console.log('Audio refs initialized successfully');
+    } catch (error) {
+      console.error('Error initializing audio:', error);
+    }
 
     // Cleanup on unmount
     return () => {
@@ -288,6 +463,7 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
     setTotalPoints(0);
     setLevel(1);
     setGameOver(false);
+    setIsWinner(false);
     gv.gameRunning = true;
     gv.leftPaddleY = gv.HEIGHT / 2 - gv.PADDLE_HEIGHT / 2;
     gv.rightPaddleY = gv.HEIGHT / 2 - gv.PADDLE_HEIGHT / 2;
@@ -391,18 +567,40 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
   // Check game over
   const checkGameOver = () => {
     const gv = gameVars.current;
-    // Use ref values for immediate comparison
+
+    // Solo mode: AI wins if 10 points ahead
     if (gv.HUMAN_VS_COMPUTER && gv.rightScoreRef >= gv.leftScoreRef + 10) {
       setGameOver(true);
-      setGameOverMessage('Game Over');
+      setGameOverMessage('LOSER');
+      setIsWinner(false);
       gv.gameRunning = false;
       audioRefs.current.background.pause();
       audioRefs.current.background.currentTime = 0;
+      // Don't auto-exit, let user click EXIT button
+      return;
+    }
 
-      setTimeout(() => {
-        submitScores();
-        showMenu();
-      }, 5000);
+    // Multiplayer mode: First to 20 points wins
+    if (!gv.HUMAN_VS_COMPUTER) {
+      if (gv.leftScoreRef >= 20) {
+        // Left player (human) wins
+        setGameOver(true);
+        setGameOverMessage('WINNER');
+        setIsWinner(true);
+        gv.gameRunning = false;
+        audioRefs.current.background.pause();
+        audioRefs.current.background.currentTime = 0;
+        return;
+      } else if (gv.rightScoreRef >= 20) {
+        // Right player wins, left player loses
+        setGameOver(true);
+        setGameOverMessage('LOSER');
+        setIsWinner(false);
+        gv.gameRunning = false;
+        audioRefs.current.background.pause();
+        audioRefs.current.background.currentTime = 0;
+        return;
+      }
     }
   };
 
@@ -748,9 +946,53 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
     if (challengePollingRef.current) {
       clearInterval(challengePollingRef.current);
     }
+    // Reset gameplay video opacity for next game
+    if (gameplayVideoRef.current) {
+      gameplayVideoRef.current.classList.remove('gameplay-fade');
+    }
+    // Reset opponent info
+    setOpponentName(null);
+    setOpponentAvatar(null);
   };
 
   const showGame = () => {
+    // Show pre-game rules screen first
+    setPlayerReady(false);
+    setOpponentReady(false);
+    setCurrentState(STATE_PRE_GAME_RULES);
+  };
+
+  const handlePlayerReady = () => {
+    setPlayerReady(true);
+
+    // Start the game intro for both solo and multiplayer modes
+    // In multiplayer, both players will start independently when they click READY
+    startGameIntro();
+  };
+
+  const handleQuitPreGame = async () => {
+    // If in multiplayer mode, cancel the challenge and notify opponent
+    if (gameMode === 'challenge' && challengeId) {
+      try {
+        await fetch('https://buddywilde.com/wp-content/themes/buddy_wilde_theme/bw-db-credentials.php', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            action: 'cancel_challenge_pregame',
+            email: user.email,
+            challenge_id: challengeId
+          })
+        });
+        console.log('Challenge cancelled - opponent will be notified');
+      } catch (error) {
+        console.error('Error cancelling challenge:', error);
+      }
+    }
+    // Return to menu
+    showMenu();
+  };
+
+  const startGameIntro = () => {
     // Reset game state
     resetGameState();
 
@@ -852,8 +1094,8 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
         setChallengeId(data.challenge_id);
         setGameMode('challenge');
         // Show waiting screen instead of starting game
+        // Polling for opponent acceptance starts automatically via useEffect
         setCurrentState(STATE_WAITING_FOR_OPPONENT);
-        // TODO: Start polling for opponent
       } else {
         console.error('✗ Failed to create challenge:', data.error || 'Unknown error');
         alert(`Failed to create challenge: ${data.error || 'Unknown error'}`);
@@ -896,6 +1138,13 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
 
   const joinChallenge = async (challenge_id) => {
     try {
+      // Find the challenge in the list to get opponent info
+      const challenge = challenges.find(c => c.id === challenge_id);
+      if (challenge) {
+        setOpponentName(challenge.creator_name);
+        setOpponentAvatar(challenge.creator_avatar);
+      }
+
       const response = await fetch('https://buddywilde.com/wp-content/themes/buddy_wilde_theme/bw-db-credentials.php', {
         method: 'POST',
         headers: {
@@ -911,9 +1160,9 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
       if (data.success) {
         setChallengeId(challenge_id);
         setGameMode('accept');
-        gameVars.current.HUMAN_VS_COMPUTER = true;
+        // Set to human vs human mode (not AI)
+        gameVars.current.HUMAN_VS_COMPUTER = false;
         showGame();
-        // TODO: Implement WebSocket connection for real-time updates
       }
     } catch (error) {
       console.error('Error joining challenge:', error);
@@ -952,13 +1201,16 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
   };
 
   if (!isLoggedIn || !user) {
+    console.log('User not logged in, returning null');
     return null;
   }
+
+  console.log('Rendering game with state:', currentState, 'showingIntro:', showingIntro);
 
   return (
     <div id="star-bonk-game" className="star-bonk-container">
       {/* Space flight loop video for menus and waiting states */}
-      {(currentState === STATE_MENU || currentState === STATE_CHALLENGE_LIST || currentState === STATE_RULES || currentState === STATE_WAITING_FOR_OPPONENT) && (
+      {(currentState === STATE_MENU || currentState === STATE_CHALLENGE_LIST || currentState === STATE_RULES || currentState === STATE_WAITING_FOR_OPPONENT || currentState === STATE_PRE_GAME_RULES || currentState === STATE_OPPONENT_CANCELLED) && !showingIntro && (
         <video
           ref={backgroundVideoRef}
           className="background-video"
@@ -981,8 +1233,23 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
           ref={introVideoRef}
           className="background-video"
           autoPlay
-          muted
           src={`${ASSET_BASE}/GRONK_BONK_NEW_GAME_INTRO_CUT_SCENE.mp4`}
+          onPlay={() => {
+            console.log('Intro video playing - stopping background audio');
+            if (audioRefs.current?.background) {
+              audioRefs.current.background.pause();
+              audioRefs.current.background.currentTime = 0;
+            }
+          }}
+          onTimeUpdate={(e) => {
+            // Fade out intro video audio 0.1 seconds before it ends
+            const video = e.target;
+            const timeRemaining = video.duration - video.currentTime;
+            if (timeRemaining <= 0.5 && timeRemaining > 0) {
+              // Linear fade out over the last 0.5 seconds
+              video.volume = timeRemaining / 0.5;
+            }
+          }}
           onEnded={() => {
             console.log('Intro video ended');
             setShowingIntro(false);
@@ -1007,6 +1274,14 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
           loop
           muted
           src={`${ASSET_BASE}/NEW_GAME_BACK_GROUND_LOOP_VIDEO.mp4`}
+          onPlay={() => {
+            // Apply fade class after video starts playing
+            // This triggers the 3-second opacity transition from 100% to 20%
+            if (gameplayVideoRef.current) {
+              console.log('Gameplay video started - applying fade to 20% opacity');
+              gameplayVideoRef.current.classList.add('gameplay-fade');
+            }
+          }}
           onError={(e) => {
             console.log('Gameplay video failed to load:', e);
             if (gameplayVideoRef.current) {
@@ -1017,7 +1292,7 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
       )}
 
       {/* Menu */}
-      {currentState === STATE_MENU && (
+      {currentState === STATE_MENU && !showingIntro && (
         <div className="game-menu" ref={(el) => {
           if (el) console.log('Game menu rendered in DOM:', el);
         }}>
@@ -1044,7 +1319,14 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
                     onClick={() => joinChallenge(challenge.id)}
                     className="challenge-button"
                   >
-                    Challenge from {challenge.creator_name} - Click to Join
+                    {challenge.creator_avatar && (
+                      <img
+                        src={challenge.creator_avatar}
+                        alt={challenge.creator_name}
+                        className="challenge-avatar"
+                      />
+                    )}
+                    <span>Challenge from {challenge.creator_name} - Click to Join</span>
                   </button>
                 </li>
               ))}
@@ -1061,11 +1343,11 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
         <div className="rules-popup">
           <h2 className="section-title">Game Rules</h2>
           <div className="rules-content">
-            <p>Control your paddle using W/S keys (or tilt on mobile)</p>
-            <p>Hit the star to score points!</p>
-            <p>Game ends when computer scores 10 points ahead</p>
-            <p>Build streaks to earn bonus sounds!</p>
-            <p>Level up every 10 points for increased difficulty</p>
+            <ul>
+              <li>Control your paddle using W/S keys (or tilt on mobile)</li>
+              <li>Score on your opponent to earn points</li>
+              <li>Points earned in a game are added to your wallet</li>
+            </ul>
           </div>
           <button onClick={showMenu} className="back-button">Back to Menu</button>
         </div>
@@ -1092,18 +1374,95 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
         </div>
       )}
 
+      {/* Pre-Game Rules Screen */}
+      {currentState === STATE_PRE_GAME_RULES && !showingIntro && (
+        <div className="rules-popup">
+          <h2 className="section-title">Game Rules</h2>
+          <div className="rules-content">
+            <ul>
+              <li>Control your paddle using W/S keys (or tilt on mobile)</li>
+              <li>Score on your opponent to earn points</li>
+              <li>Points earned in a game are added to your wallet</li>
+            </ul>
+          </div>
+          {gameMode === 'solo' || playerReady ? (
+            <>
+              {playerReady && gameMode !== 'solo' && !opponentReady && (
+                <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+                  <h3 className="section-title" style={{ fontSize: '1.5rem', color: '#39ff14' }}>
+                    Waiting for opponent...
+                  </h3>
+                </div>
+              )}
+              <div className="menu-buttons">
+                {!playerReady && (
+                  <button onClick={handlePlayerReady} className="menu-button">
+                    READY
+                  </button>
+                )}
+                <button onClick={handleQuitPreGame} className="back-button">
+                  QUIT
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="menu-buttons">
+              <button onClick={handlePlayerReady} className="menu-button">
+                READY
+              </button>
+              <button onClick={handleQuitPreGame} className="back-button">
+                QUIT
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Opponent Cancelled */}
+      {currentState === STATE_OPPONENT_CANCELLED && (
+        <div className="game-menu">
+          <h2 className="game-title">Challenge Cancelled</h2>
+          <div className="rules-content" style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <p style={{ fontSize: '1.3rem', color: '#ff4444' }}>Your opponent has cancelled this challenge</p>
+          </div>
+          <div className="menu-buttons">
+            <button onClick={showMenu} className="menu-button">
+              Return to Menu
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Game */}
       {currentState === STATE_PLAYING && (
         <>
           <div className="game-hud">
-            <div className="score left-score">{leftScore}</div>
+            <div className="score left-score">
+              <div className="player-info">
+                {user.avatar_url && (
+                  <img src={user.avatar_url} alt={user.display_name} className="player-avatar" />
+                )}
+                <span className="player-username">{user.display_name}</span>
+              </div>
+              <span>{leftScore}</span>
+            </div>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
               <button onClick={handleExit} className="exit-button">✖</button>
               {!gameVars.current.isMobile && (
                 <button onClick={toggleFullscreen} className="fullscreen-button">⛶</button>
               )}
             </div>
-            <div className="score right-score">{rightScore}</div>
+            <div className="score right-score">
+              <span>{rightScore}</span>
+              {gameMode !== 'solo' && opponentName && (
+                <div className="player-info">
+                  <span className="player-username">{opponentName}</span>
+                  {opponentAvatar && (
+                    <img src={opponentAvatar} alt={opponentName} className="player-avatar" />
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div ref={gamePlayWindowRef} className="game-play-window">
@@ -1112,7 +1471,22 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
 
           {gameOver && (
             <div className="game-over">
-              {gameOverMessage}
+              <div style={{ marginBottom: '2rem' }}>{gameOverMessage}</div>
+              <button
+                onClick={() => {
+                  submitScores();
+                  showMenu();
+                }}
+                className="menu-button"
+                style={{
+                  fontSize: '1.5rem',
+                  padding: '1rem 3rem',
+                  margin: '0 auto',
+                  display: 'block'
+                }}
+              >
+                EXIT
+              </button>
             </div>
           )}
         </>

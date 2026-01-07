@@ -27,8 +27,14 @@
   height: auto;
   transform: translate(-50%, -50%);
   object-fit: cover;
-  opacity: 0.2;
+  opacity: 1;
   z-index: 0;
+  transition: opacity 3s linear;
+}
+
+/* Gameplay video that fades to 20% opacity */
+.background-video.gameplay-fade {
+  opacity: 0.2;
 }
 
 /* Menu Styles */
@@ -42,7 +48,11 @@
   background: transparent;
   padding: 3rem;
   border-radius: 15px;
-  backdrop-filter: blur(10px);
+  /* CONTAINER BLUR EFFECT - Creates frosted glass appearance */
+  backdrop-filter: blur(0px);
+  /* FEATHERED EDGE EFFECT - Creates soft fade at container edges */
+  -webkit-mask-image: radial-gradient(ellipse 100% 100% at 50% 50%, black 60%, transparent 100%);
+  mask-image: radial-gradient(ellipse 100% 100% at 50% 50%, black 60%, transparent 100%);
 }
 
 .game-title {
@@ -102,7 +112,11 @@
   background: transparent;
   padding: 2rem;
   border-radius: 15px;
+  /* CONTAINER BLUR EFFECT - Creates frosted glass appearance */
   backdrop-filter: blur(10px);
+  /* FEATHERED EDGE EFFECT - Creates soft fade at container edges */
+  -webkit-mask-image: radial-gradient(ellipse 100% 100% at 50% 50%, black 60%, transparent 100%);
+  mask-image: radial-gradient(ellipse 100% 100% at 50% 50%, black 60%, transparent 100%);
   max-width: 600px;
   width: 90%;
   max-height: 80vh;
@@ -118,8 +132,8 @@
 }
 
 .challenges-ul {
-  list-style: none;
-  padding: 0;
+  list-style: disc;
+  padding-left: 1.5rem;
   margin: 0 0 2rem 0;
 }
 
@@ -128,22 +142,45 @@
 }
 
 .challenge-button {
-  font-family: 'Ethnocentric', Arial, sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
   width: 100%;
   padding: 1rem;
-  background: rgba(100, 108, 255, 0.8);
+  background: transparent;
   color: white;
-  border: 2px solid rgba(100, 108, 255, 0.9);
+  border: 2px solid white;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
   font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  animation: challengeGlow 3s ease-in-out infinite;
 }
 
 .challenge-button:hover {
-  background: rgba(100, 108, 255, 1);
+  background: rgba(255, 255, 255, 0.1);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(100, 108, 255, 0.4);
+}
+
+@keyframes challengeGlow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.4),
+                0 0 20px rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.6),
+                0 0 30px rgba(255, 255, 255, 0.4),
+                0 0 40px rgba(255, 255, 255, 0.2);
+  }
+}
+
+.challenge-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255, 255, 255, 0.5);
 }
 
 .no-challenges {
@@ -183,16 +220,30 @@
   background: transparent;
   padding: 2rem;
   border-radius: 15px;
-  backdrop-filter: blur(10px);
+  /* CONTAINER BLUR EFFECT - Creates frosted glass appearance */
+  backdrop-filter: blur(0px);
+  /* FEATHERED EDGE EFFECT - Creates soft fade at container edges */
+  -webkit-mask-image: radial-gradient(ellipse 100% 100% at 50% 50%, black 60%, transparent 100%);
+  mask-image: radial-gradient(ellipse 100% 100% at 50% 50%, black 60%, transparent 100%);
   max-width: 600px;
   width: 90%;
 }
 
 .rules-content {
   color: rgba(255, 255, 255, 0.9);
+  font-family: Arial, Helvetica, sans-serif;
   font-size: 1.1rem;
   line-height: 1.8;
   margin-bottom: 2rem;
+}
+
+.rules-content ul {
+  list-style-type: none;
+  
+}
+
+.rules-content li {
+  margin: 0.75rem 0;
 }
 
 .rules-content p {
@@ -224,11 +275,39 @@
 .left-score {
   text-align: left;
   justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .right-score {
   text-align: right;
   justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-direction: row-reverse;
+}
+
+.player-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.player-avatar {
+  height: clamp(1.5rem, 4vw, 3rem);
+  width: clamp(1.5rem, 4vw, 3rem);
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+}
+
+.player-username {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: clamp(1rem, 2.5vw, 1.5rem);
+  color: white;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
 }
 
 .exit-button,
