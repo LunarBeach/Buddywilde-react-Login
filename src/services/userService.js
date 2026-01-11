@@ -92,7 +92,7 @@ export const userService = {
     }
   },
 
-  // NEW: Fetch current user data from database
+  // Fetch current user data from database
   async getUserData(userData) {
     try {
       const result = await api.post('/bw-db-credentials.php', {
@@ -102,6 +102,33 @@ export const userService = {
       return result
     } catch (error) {
       console.error('Failed to fetch user data:', error)
+      throw error
+    }
+  },
+
+  // Fetch available avatars from WordPress media library
+  async getAvailableAvatars() {
+    try {
+      const result = await api.post('/bw-db-credentials.php', {
+        action: 'get_available_avatars'
+      })
+      return result
+    } catch (error) {
+      console.error('Failed to fetch available avatars:', error)
+      throw error
+    }
+  },
+
+  // Update user profile (username, bio, avatar, points)
+  async updateUserProfile(userData) {
+    try {
+      const result = await api.post('/bw-db-credentials.php', {
+        ...userData,
+        action: 'update_user_profile'
+      })
+      return result
+    } catch (error) {
+      console.error('Failed to update user profile:', error)
       throw error
     }
   }

@@ -1,0 +1,21 @@
+# Add these lines to your .htaccess file on the server
+# Place this in the WordPress root directory or in /wp-content/uploads/
+
+# Enable CORS for images
+<IfModule mod_headers.c>
+    # Allow images to be loaded from localhost during development
+    <FilesMatch "\.(jpg|jpeg|png|gif|webp|svg)$">
+        Header set Access-Control-Allow-Origin "http://localhost:5173"
+        Header set Access-Control-Allow-Methods "GET, OPTIONS"
+        Header set Access-Control-Allow-Headers "Content-Type"
+        Header set Cross-Origin-Resource-Policy "cross-origin"
+    </FilesMatch>
+</IfModule>
+
+# Alternative: Allow from any origin (less secure, use only for development)
+# <IfModule mod_headers.c>
+#     <FilesMatch "\.(jpg|jpeg|png|gif|webp|svg)$">
+#         Header set Access-Control-Allow-Origin "*"
+#         Header set Cross-Origin-Resource-Policy "cross-origin"
+#     </FilesMatch>
+# </IfModule>

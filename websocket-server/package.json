@@ -1,0 +1,22 @@
+{
+  "name": "buddywilde-game-server",
+  "version": "1.0.0",
+  "description": "WebSocket server for BuddyWilde real-time multiplayer games",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "keywords": ["websocket", "multiplayer", "game", "pong"],
+  "author": "BuddyWilde",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.14.2",
+    "mysql2": "^3.6.5",
+    "dotenv": "^16.3.1",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

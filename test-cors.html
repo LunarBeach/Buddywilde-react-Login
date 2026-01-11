@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CORS Test</title>
+</head>
+<body>
+    <h1>Testing CORS for Images</h1>
+    <p>If you see the image below, CORS is working:</p>
+    <img src="https://buddywilde.com/wp-content/plugins/buddywilde-header/assets/buddy-default.png"
+         alt="Test Avatar"
+         style="width: 100px; height: 100px;"
+         crossorigin="anonymous">
+    <script>
+        // Test image loading
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+            document.body.innerHTML += '<p style="color: green;">✓ CORS is working! Image loaded successfully.</p>';
+        };
+        img.onerror = () => {
+            document.body.innerHTML += '<p style="color: red;">✗ CORS is NOT working. Image blocked by CORS/ORB.</p>';
+        };
+        img.src = 'https://buddywilde.com/wp-content/plugins/buddywilde-header/assets/buddy-default.png';
+    </script>
+</body>
+</html>
