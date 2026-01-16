@@ -30,7 +30,7 @@ const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
 
   // Initialize audio
   useEffect(() => {
-    clickSoundRef.current = new Audio('https://buddywilde.com/wp-content/uploads/2025/10/gronk_bonk_paddle_strike.wav');
+    clickSoundRef.current = new Audio('/assets/sfx/gronk_bonk_paddle_strike.wav');
     
     // Handle window resize
     const handleResize = () => {
@@ -110,8 +110,8 @@ const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
       filename = parts[parts.length - 1];
     }
 
-    // All avatars (including default) are in the theme assets folder
-    return `https://buddywilde.com/wp-content/themes/buddy_wilde_theme/assets/avatars/${filename}`;
+    // All avatars are in the assets folder
+    return `/assets/avatars/${filename}`;
   };
 
   // Play click sound
@@ -197,10 +197,10 @@ const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center' }}>
-              <img 
-                src="https://buddywilde.com/wp-content/uploads/2025/10/buddy_wilde_swan_icon.png" 
-                alt="Swan" 
-                style={{ 
+              <img
+                src="/assets/graphics/buddy_wilde_swan_icon.png"
+                alt="Swan"
+                style={{
                   height: '6vh',
                   width: 'auto',
                   pointerEvents: 'none',
@@ -215,10 +215,10 @@ const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
                 pointerEvents: 'none',
                 whiteSpace: 'nowrap'
               }}>Coming 2026</span>
-              <img 
-                src="https://buddywilde.com/wp-content/uploads/2025/10/buddy_wilde_swan_icon.png" 
-                alt="Swan" 
-                style={{ 
+              <img
+                src="/assets/graphics/buddy_wilde_swan_icon.png"
+                alt="Swan"
+                style={{
                   height: '6vh',
                   width: 'auto',
                   pointerEvents: 'none'
@@ -270,29 +270,31 @@ const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
               alignItems: 'center',
               paddingLeft: '1.5rem'
             }}>
-              {isLoggedIn && (
+              {isLoggedIn ? (
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
                   height: '100%'
                 }}>
                   {avatarUrl && (
-                    <img 
-                      className="bwh-avatar" 
-                      src={avatarUrl} 
-                      alt="Avatar" 
-                      style={{
-                        height: '8vh',
-                        width: 'auto',
-                        borderRadius: '50%',
-                        objectFit: 'cover',
-                        marginRight: '1rem'
-                      }}
-                      onError={(e) => {
-                        // Fallback to default avatar on error
-                        e.target.src = 'https://buddywilde.com/wp-content/plugins/buddywilde-header/assets/buddy-default.png';
-                      }}
-                    />
+                    <Link to="/">
+                      <img
+                        className="bwh-avatar"
+                        src={avatarUrl}
+                        alt="Avatar - Click to go home"
+                        style={{
+                          height: '8vh',
+                          width: 'auto',
+                          borderRadius: '50%',
+                          objectFit: 'cover',
+                          marginRight: '1rem',
+                          cursor: 'pointer'
+                        }}
+                        onError={(e) => {
+                          e.target.src = '/assets/avatars/buddy-default.png';
+                        }}
+                      />
+                    </Link>
                   )}
                   <div style={{
                     display: 'flex',
@@ -318,6 +320,18 @@ const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
                     }}>You have {points} Points!</span>
                   </div>
                 </div>
+              ) : (
+                <Link to="/">
+                  <img
+                    src="/assets/graphics/Buddy_Wilde_Header_Logo.png"
+                    alt="Buddy Wilde - Click to go home"
+                    style={{
+                      height: '8vh',
+                      width: 'auto',
+                      cursor: 'pointer'
+                    }}
+                  />
+                </Link>
               )}
             </div>
             
@@ -344,13 +358,13 @@ const BuddyHeader = ({ isLoggedIn, user, onLogout, isFrontPage = false }) => {
                   height: '100%',
                   width: 'auto'
                 }}>
-                  <source 
-                    src="https://buddywilde.com/wp-content/uploads/2025/10/Buddy_Wilde_Hamburger_video.mp4" 
+                  <source
+                    src="/assets/videos/Buddy_Wilde_Hamburger_video.mp4"
                     type="video/mp4"
                   />
-                  <img 
-                    src="https://buddywilde.com/wp-content/uploads/2025/10/buddy_wilde_hamburger_menu_icon.png" 
-                    alt="Menu" 
+                  <img
+                    src="/assets/graphics/buddy_wilde_hamburger_menu_icon.png"
+                    alt="Menu"
                     style={{
                       height: '100%',
                       width: 'auto'

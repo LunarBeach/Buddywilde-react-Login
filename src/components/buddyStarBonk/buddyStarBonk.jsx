@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { api } from '../../services/api';
 import './buddyStarBonk.css';
 
 const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
@@ -163,16 +164,9 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
 
       const checkChallengeStatus = async () => {
         try {
-          const response = await fetch('https://buddywilde.com/wp-content/themes/buddy_wilde_theme/bw-db-credentials.php', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-              action: 'check_challenge_status',
-              challenge_id: challengeId
-            })
+          const data = await api.post('/challenge/status', {
+            challenge_id: challengeId
           });
-
-          const data = await response.json();
           console.log('Challenge status:', data);
 
           if (data.success && data.status === 'active') {
@@ -186,6 +180,8 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
             }
             // Set to human vs human mode
             gameVars.current.HUMAN_VS_COMPUTER = false;
+            // Connect to WebSocket as creator (left paddle)
+            connectToWebSocket(challengeId, 'creator');
             setCurrentState(STATE_PRE_GAME_RULES);
           } else if (data.success && data.status === 'cancelled') {
             // Challenge was cancelled by opponent
@@ -299,6 +295,11 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
   const gameplayVideoRef = useRef(null);
   const gameLoopRef = useRef(null);
   const challengePollingRef = useRef(null);
+  const wsRef = useRef(null);
+  const [wsConnected, setWsConnected] = useState(false);
+
+  // WebSocket URL - use environment variable or default
+  const WS_URL = import.meta.env.VITE_WS_URL || 'wss://buddywilde.com/ws';
 
   // Audio refs
   const audioRefs = useRef({
@@ -361,7 +362,9 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
 
   const PADDLE_ANIMATION_DURATION = 2000;
   const SMOOTHING_FACTOR = 0.5;
-  const ASSET_BASE = 'https://buddywilde.com/wp-content/themes/buddy_wilde_theme/assets/star-bonk-assets';
+  // Use relative path - served from /var/www/buddywilde.com/public_html/assets/games/starbonk on VPS
+  // and from public/assets/games/starbonk locally
+  const ASSET_BASE = '/assets/games/starbonk';
 
   // Initialize audio on component mount
   useEffect(() => {
@@ -401,8 +404,167 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
       if (challengePollingRef.current) {
         clearInterval(challengePollingRef.current);
       }
+      // Close WebSocket connection
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
     };
   }, []);
+
+  // WebSocket connection handler for multiplayer games
+  const connectToWebSocket = (challengeId, role) => {
+    // Don't connect if already connected
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      console.log('WebSocket already connected');
+      return;
+    }
+
+    console.log(`🔌 Connecting to WebSocket: ${WS_URL}`);
+    const ws = new WebSocket(WS_URL);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      console.log('✅ WebSocket connected');
+      setWsConnected(true);
+
+      // Join the game
+      ws.send(JSON.stringify({
+        type: 'join_game',
+        challengeId: challengeId,
+        userId: user?.id || user?.email,
+        role: role // 'creator' or 'opponent'
+      }));
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        handleWebSocketMessage(data);
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('❌ WebSocket error:', error);
+      setWsConnected(false);
+    };
+
+    ws.onclose = () => {
+      console.log('🔌 WebSocket disconnected');
+      setWsConnected(false);
+      wsRef.current = null;
+    };
+  };
+
+  // Handle incoming WebSocket messages
+  const handleWebSocketMessage = (data) => {
+    switch (data.type) {
+      case 'game_state':
+        // Initial game state received
+        console.log('📥 Received initial game state:', data);
+        // Store the role (creator = left paddle, opponent = right paddle)
+        gameVars.current.myRole = data.role;
+        gameVars.current.wsConfig = data.config;
+        break;
+
+      case 'game_update':
+        // Server-authoritative game state update
+        if (data.state) {
+          // Update ball position from server (only in multiplayer)
+          if (!gameVars.current.HUMAN_VS_COMPUTER) {
+            gameVars.current.ballX = data.state.ball.x;
+            gameVars.current.ballY = data.state.ball.y;
+            gameVars.current.ballSpeedX = data.state.ball.vx;
+            gameVars.current.ballSpeedY = data.state.ball.vy;
+
+            // Update opponent paddle position
+            if (gameVars.current.myRole === 'creator') {
+              // I'm left paddle, update right paddle from server
+              gameVars.current.rightPaddleY = data.state.paddles.right.y;
+            } else {
+              // I'm right paddle, update left paddle from server
+              gameVars.current.leftPaddleY = data.state.paddles.left.y;
+            }
+
+            // Update scores
+            if (data.state.scores.left !== gameVars.current.leftScoreRef) {
+              gameVars.current.leftScoreRef = data.state.scores.left;
+              setLeftScore(data.state.scores.left);
+            }
+            if (data.state.scores.right !== gameVars.current.rightScoreRef) {
+              gameVars.current.rightScoreRef = data.state.scores.right;
+              setRightScore(data.state.scores.right);
+            }
+          }
+        }
+        break;
+
+      case 'player_joined':
+        console.log(`👤 Player joined as ${data.role}`);
+        // Opponent has joined - can show notification
+        break;
+
+      case 'player_disconnected':
+        console.log(`👋 Player disconnected: ${data.role}`);
+        // Handle opponent disconnect - maybe pause game or show message
+        setOpponentReady(false);
+        break;
+
+      case 'game_started':
+        console.log('🏁 Game started!');
+        break;
+
+      case 'game_over':
+        console.log('🎮 Game over:', data);
+        setGameOver(true);
+        const didIWin = (gameVars.current.myRole === 'creator' && data.winner === 'left') ||
+                        (gameVars.current.myRole === 'opponent' && data.winner === 'right');
+        setIsWinner(didIWin);
+        setGameOverMessage(didIWin ? 'YOU WIN!' : 'YOU LOSE!');
+
+        // Play appropriate sound
+        if (didIWin && audioRefs.current?.winnerSound) {
+          audioRefs.current.winnerSound.play().catch(e => console.log('Winner sound failed:', e));
+        } else if (!didIWin && audioRefs.current?.loserSound) {
+          audioRefs.current.loserSound.play().catch(e => console.log('Loser sound failed:', e));
+        }
+        break;
+
+      case 'opponent_ready':
+        console.log('Opponent is ready!');
+        setOpponentReady(true);
+        break;
+
+      case 'error':
+        console.error('WebSocket error from server:', data.message);
+        break;
+
+      default:
+        console.log('Unknown WebSocket message type:', data.type);
+    }
+  };
+
+  // Send paddle position to server in multiplayer mode
+  const sendPaddleUpdate = (y, direction) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && !gameVars.current.HUMAN_VS_COMPUTER) {
+      wsRef.current.send(JSON.stringify({
+        type: 'paddle_move',
+        y: y,
+        direction: direction
+      }));
+    }
+  };
+
+  // Disconnect WebSocket
+  const disconnectWebSocket = () => {
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+      setWsConnected(false);
+    }
+  };
 
   // Keyboard event handlers
   useEffect(() => {
@@ -627,22 +789,13 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
 
     try {
       const requestBody = {
-        action: 'submit_star_bonk_score',
         email: user.email,
         score: scoreToSend,
         challenge_id: challengeId
       };
       console.log('Request body:', JSON.stringify(requestBody, null, 2));
 
-      const response = await fetch('https://buddywilde.com/wp-content/themes/buddy_wilde_theme/bw-db-credentials.php', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      const data = await response.json();
+      const data = await api.post('/challenge/score', requestBody);
       console.log('Score submission response:', data);
 
       if (data.success) {
@@ -732,7 +885,21 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
     gv.smoothedGamma = gv.smoothedGamma * SMOOTHING_FACTOR + gamma * (1 - SMOOTHING_FACTOR);
 
     const tiltSpeed = gv.smoothedGamma / 3.75;
-    gv.leftPaddleY = Math.max(0, Math.min(gv.HEIGHT - gv.PADDLE_HEIGHT, gv.leftPaddleY + tiltSpeed));
+
+    if (gv.HUMAN_VS_COMPUTER) {
+      // Solo mode: control left paddle
+      gv.leftPaddleY = Math.max(0, Math.min(gv.HEIGHT - gv.PADDLE_HEIGHT, gv.leftPaddleY + tiltSpeed));
+    } else {
+      // Multiplayer mode: control your assigned paddle
+      const isCreator = gv.myRole === 'creator';
+      if (isCreator) {
+        gv.leftPaddleY = Math.max(0, Math.min(gv.HEIGHT - gv.PADDLE_HEIGHT, gv.leftPaddleY + tiltSpeed));
+        sendPaddleUpdate(gv.leftPaddleY, tiltSpeed > 0 ? 'down' : 'up');
+      } else {
+        gv.rightPaddleY = Math.max(0, Math.min(gv.HEIGHT - gv.PADDLE_HEIGHT, gv.rightPaddleY + tiltSpeed));
+        sendPaddleUpdate(gv.rightPaddleY, tiltSpeed > 0 ? 'down' : 'up');
+      }
+    }
   };
 
   // Game loop
@@ -770,14 +937,53 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
 
     // Paddle controls
     if (!gv.isPaddleAnimating) {
-      if (!gv.isMobile) {
-        if (gv.keys['KeyW']) gv.leftPaddleY = Math.max(0, gv.leftPaddleY - 12);
-        if (gv.keys['KeyS']) gv.leftPaddleY = Math.min(gv.HEIGHT - gv.PADDLE_HEIGHT, gv.leftPaddleY + 12);
-      }
-
       if (gv.HUMAN_VS_COMPUTER) {
+        // Solo mode: left paddle controlled by player, right by AI
+        if (!gv.isMobile) {
+          if (gv.keys['KeyW']) gv.leftPaddleY = Math.max(0, gv.leftPaddleY - 12);
+          if (gv.keys['KeyS']) gv.leftPaddleY = Math.min(gv.HEIGHT - gv.PADDLE_HEIGHT, gv.leftPaddleY + 12);
+        }
         if (gv.ballSpeedX > 0 && gv.ballLaunched) {
           gv.rightPaddleY = aiMove(gv.rightPaddleY);
+        }
+      } else {
+        // Multiplayer mode: each player controls their own paddle
+        const isCreator = gv.myRole === 'creator';
+        let paddleMoved = false;
+        let direction = null;
+
+        if (!gv.isMobile) {
+          if (isCreator) {
+            // Creator controls left paddle
+            if (gv.keys['KeyW']) {
+              gv.leftPaddleY = Math.max(0, gv.leftPaddleY - 12);
+              direction = 'up';
+              paddleMoved = true;
+            }
+            if (gv.keys['KeyS']) {
+              gv.leftPaddleY = Math.min(gv.HEIGHT - gv.PADDLE_HEIGHT, gv.leftPaddleY + 12);
+              direction = 'down';
+              paddleMoved = true;
+            }
+            if (paddleMoved) {
+              sendPaddleUpdate(gv.leftPaddleY, direction);
+            }
+          } else {
+            // Opponent controls right paddle
+            if (gv.keys['KeyW'] || gv.keys['ArrowUp']) {
+              gv.rightPaddleY = Math.max(0, gv.rightPaddleY - 12);
+              direction = 'up';
+              paddleMoved = true;
+            }
+            if (gv.keys['KeyS'] || gv.keys['ArrowDown']) {
+              gv.rightPaddleY = Math.min(gv.HEIGHT - gv.PADDLE_HEIGHT, gv.rightPaddleY + 12);
+              direction = 'down';
+              paddleMoved = true;
+            }
+            if (paddleMoved) {
+              sendPaddleUpdate(gv.rightPaddleY, direction);
+            }
+          }
         }
       }
 
@@ -918,16 +1124,9 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
     // If there's an active challenge, cancel it
     if (challengeId) {
       try {
-        await fetch('https://buddywilde.com/wp-content/themes/buddy_wilde_theme/bw-db-credentials.php', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            action: 'end_star_bonk_challenge',
-            email: user.email,
-            challenge_id: challengeId
-          })
+        await api.post('/challenge/end', {
+          email: user.email,
+          challenge_id: challengeId
         });
         console.log('Challenge cancelled when returning to menu');
       } catch (error) {
@@ -936,8 +1135,12 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
       setChallengeId(null);
     }
 
+    // Disconnect WebSocket if connected
+    disconnectWebSocket();
+
     setCurrentState(STATE_MENU);
     gameVars.current.gameRunning = false;
+    gameVars.current.myRole = null; // Clear multiplayer role
     audioRefs.current.background.pause();
     audioRefs.current.background.currentTime = 0;
     if (gameLoopRef.current) {
@@ -974,14 +1177,9 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
     // If in multiplayer mode, cancel the challenge and notify opponent
     if (gameMode === 'challenge' && challengeId) {
       try {
-        await fetch('https://buddywilde.com/wp-content/themes/buddy_wilde_theme/bw-db-credentials.php', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            action: 'cancel_challenge_pregame',
-            email: user.email,
-            challenge_id: challengeId
-          })
+        await api.post('/challenge/end', {
+          email: user.email,
+          challenge_id: challengeId
         });
         console.log('Challenge cancelled - opponent will be notified');
       } catch (error) {
@@ -1040,17 +1238,9 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
 
   const loadChallenges = async () => {
     try {
-      const response = await fetch('https://buddywilde.com/wp-content/themes/buddy_wilde_theme/bw-db-credentials.php', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'get_star_bonk_challenges',
-          email: user.email
-        })
+      const data = await api.post('/challenge/list', {
+        email: user.email
       });
-      const data = await response.json();
       if (data.success && data.challenges) {
         setChallenges(data.challenges);
       } else {
@@ -1074,19 +1264,9 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
 
     try {
       console.log('Sending create challenge request...');
-      const response = await fetch('https://buddywilde.com/wp-content/themes/buddy_wilde_theme/bw-db-credentials.php', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'create_star_bonk_challenge',
-          email: user.email
-        })
+      const data = await api.post('/challenge/create', {
+        email: user.email
       });
-
-      console.log('Response status:', response.status);
-      const data = await response.json();
       console.log('Create challenge response:', data);
 
       if (data.success && data.challenge_id) {
@@ -1112,16 +1292,9 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
     // Cancel the challenge in the database
     if (challengeId) {
       try {
-        await fetch('https://buddywilde.com/wp-content/themes/buddy_wilde_theme/bw-db-credentials.php', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            action: 'end_star_bonk_challenge',
-            email: user.email,
-            challenge_id: challengeId
-          })
+        await api.post('/challenge/end', {
+          email: user.email,
+          challenge_id: challengeId
         });
         console.log('Challenge cancelled');
       } catch (error) {
@@ -1145,23 +1318,17 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
         setOpponentAvatar(challenge.creator_avatar);
       }
 
-      const response = await fetch('https://buddywilde.com/wp-content/themes/buddy_wilde_theme/bw-db-credentials.php', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'join_star_bonk_challenge',
-          email: user.email,
-          challenge_id: challenge_id
-        })
+      const data = await api.post('/challenge/join', {
+        email: user.email,
+        challenge_id: challenge_id
       });
-      const data = await response.json();
       if (data.success) {
         setChallengeId(challenge_id);
         setGameMode('accept');
         // Set to human vs human mode (not AI)
         gameVars.current.HUMAN_VS_COMPUTER = false;
+        // Connect to WebSocket as opponent (right paddle)
+        connectToWebSocket(challenge_id, 'opponent');
         showGame();
       }
     } catch (error) {
@@ -1172,16 +1339,9 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
   const handleExit = async () => {
     if (challengeId) {
       try {
-        await fetch('https://buddywilde.com/wp-content/themes/buddy_wilde_theme/bw-db-credentials.php', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            action: 'end_star_bonk_challenge',
-            email: user.email,
-            challenge_id: challengeId
-          })
+        await api.post('/challenge/end', {
+          email: user.email,
+          challenge_id: challengeId
         });
       } catch (error) {
         console.error('Error ending challenge:', error);

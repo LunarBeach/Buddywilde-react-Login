@@ -1,6 +1,7 @@
 @font-face {
   font-family: 'Nodo';
-  src: url('https://buddywilde.com/wp-content/uploads/2025/10/Nodo.ttf') format('truetype');
+  src: url('/assets/fonts/Nodo.woff2') format('woff2'),
+       url('/assets/fonts/Nodo.woff') format('woff');
   font-weight: normal;
   font-style: normal;
 }

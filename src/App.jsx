@@ -164,12 +164,7 @@ function App() {
               {!isLoggedIn && <BuddyForm onLoginSuccess={handleLoginSuccess} onRegistrationSuccess={handleRegistrationSuccess} />}
             </>
           } />
-          <Route path="/contact" element={
-            <>
-              {!isLoggedIn && <BuddyForm onLoginSuccess={handleLoginSuccess} onRegistrationSuccess={handleRegistrationSuccess} />}
-              <ContactForm />
-            </>
-          } />
+          <Route path="/contact" element={<ContactForm />} />
           <Route path="/wiki" element={
             <>
               {!isLoggedIn && <BuddyForm onLoginSuccess={handleLoginSuccess} onRegistrationSuccess={handleRegistrationSuccess} />}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './buddyContact.css';
+import { api } from '../../services/api';
 
 const ContactForm = () => {
   const [formData, setFormData] = useState({
@@ -17,7 +18,7 @@ const ContactForm = () => {
 
   // Initialize audio
   useEffect(() => {
-    hoverSoundRef.current = new Audio('https://buddywilde.com/wp-content/uploads/2025/10/Highlighter_stroke.wav');
+    hoverSoundRef.current = new Audio('/assets/sfx/Highlighter_stroke.wav');
   }, []);
 
   // Email validation
@@ -98,39 +99,25 @@ const ContactForm = () => {
     
     // Submit form
     setIsSubmitting(true);
-    
+
     try {
-      const formDataToSend = new FormData();
-      formDataToSend.append('action', 'buddywilde_send_contact');
-      formDataToSend.append('contact_email', formData.email);
-      formDataToSend.append('contact_subject', formData.subject);
-      formDataToSend.append('contact_message', formData.message);
-      
-      // Get nonce from WordPress (you'll need to pass this as a prop or fetch it)
-      const nonce = document.querySelector('input[name="contact_nonce"]')?.value || 
-                   document.querySelector('meta[name="contact-nonce"]')?.getAttribute('content');
-      
-      if (nonce) {
-        formDataToSend.append('contact_nonce', nonce);
-      }
-      
-      const response = await fetch('/wp-admin/admin-ajax.php', {
-        method: 'POST',
-        body: formDataToSend,
-        credentials: 'same-origin'
+      const result = await api.post('/contact', {
+        email: formData.email,
+        subject: formData.subject,
+        message: formData.message
       });
-      
-      const data = await response.json();
-      
-      if (data.success) {
+
+      if (result.success) {
         setSubmitMessage('Message sent successfully!');
         setMessageType('success');
         setFormData({ email: '', subject: '', message: '' });
       } else {
-        setSubmitMessage(data.data || 'Error sending message. Please try again.');
+        setSubmitMessage(result.error || 'Error sending message. Please try again.');
         setMessageType('error');
       }
+
     } catch (error) {
+      console.error('Contact form error:', error);
       setSubmitMessage('Error sending message. Please try again.');
       setMessageType('error');
     } finally {

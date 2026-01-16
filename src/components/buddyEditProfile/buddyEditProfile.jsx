@@ -285,8 +285,14 @@ const BuddyEditProfile = ({ user, onProfileUpdate }) => {
       filename = 'buddy-default.png';
     }
 
-    // All avatars (including default) are in the theme assets folder
-    return `https://buddywilde.com/wp-content/themes/buddy_wilde_theme/assets/avatars/${filename}`;
+    // Extract just the filename if it includes a path
+    if (filename.includes('/')) {
+      const parts = filename.split('/');
+      filename = parts[parts.length - 1];
+    }
+
+    // Use relative path - Nginx will serve from /var/www/buddywilde.com/public_html/assets/
+    return `/assets/avatars/${filename}`;
   };
 
   if (isLoading) {
@@ -366,7 +372,7 @@ const BuddyEditProfile = ({ user, onProfileUpdate }) => {
                             alt={avatar.alt || 'Avatar'}
                             className={`avatar-image ${!canAfford ? 'grayscale' : ''}`}
                             onError={(e) => {
-                              e.target.src = 'https://buddywilde.com/wp-content/plugins/buddywilde-header/assets/buddy-default.png';
+                              e.target.src = '/assets/avatars/buddy-default.png';
                             }}
                           />
                         </div>

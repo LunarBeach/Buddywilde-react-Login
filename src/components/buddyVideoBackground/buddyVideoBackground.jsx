@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './buddyVideoBackground.css';
+import { api } from '../../services/api';
 
 const BuddyVideoBackground = () => {
   const [videos, setVideos] = useState([]);
@@ -15,38 +16,32 @@ const BuddyVideoBackground = () => {
     };
   }, []);
 
-  // Fetch list of videos from the server
+  // Fetch list of loop videos from API
   useEffect(() => {
     const fetchVideos = async () => {
+      console.log('Fetching loop videos from API...');
       try {
-        console.log('Fetching loop videos...');
-        const response = await fetch('https://buddywilde.com/wp-content/themes/buddy_wilde_theme/bw-db-credentials.php', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            action: 'get_loop_videos'
-          })
-        });
+        const response = await api.get('/assets/loop-videos');
 
-        console.log('Response status:', response.status);
-        const data = await response.json();
-        console.log('Videos response data:', data);
+        if (response.success && response.videos.length > 0) {
+          const availableVideos = response.videos;
+          console.log('Videos loaded:', availableVideos);
+          setVideos(availableVideos);
 
-        if (data.success && data.videos && data.videos.length > 0) {
-          console.log('Videos loaded:', data.videos);
-          setVideos(data.videos);
           // Pick a random first video
-          const randomIndex = Math.floor(Math.random() * data.videos.length);
-          console.log('Starting with video index:', randomIndex, 'filename:', data.videos[randomIndex]);
+          const randomIndex = Math.floor(Math.random() * availableVideos.length);
+          console.log('Starting with video index:', randomIndex, 'filename:', availableVideos[randomIndex]);
           setCurrentVideoIndex(randomIndex);
-          // Don't set previousVideoIndex here - leave it as null so first transition has all videos available
         } else {
-          console.error('No videos found or invalid response:', data);
+          console.error('No videos available from API');
         }
       } catch (error) {
         console.error('Error fetching videos:', error);
+        // Fallback to hardcoded list if API fails
+        const fallbackVideos = ['loop_video_1.mp4', 'loop_video_2.mp4', 'loop_video_3.mp4'];
+        setVideos(fallbackVideos);
+        const randomIndex = Math.floor(Math.random() * fallbackVideos.length);
+        setCurrentVideoIndex(randomIndex);
       }
     };
 
@@ -117,7 +112,7 @@ const BuddyVideoBackground = () => {
         onEnded={handleVideoEnd}
       >
         <source
-          src={`https://buddywilde.com/wp-content/themes/buddy_wilde_theme/assets/loop_videos/${currentVideo}`}
+          src={`/assets/videos/loop_videos/${currentVideo}`}
           type="video/mp4"
         />
         Your browser does not support the video tag.
