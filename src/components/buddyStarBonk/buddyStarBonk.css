@@ -1,6 +1,6 @@
 @font-face {
   font-family: 'Ethnocentric';
-  src: url('https://buddywilde.com/wp-content/themes/buddy_wilde_theme/assets/fonts/Ethnocentric-Regular.woff') format('woff');
+  src: url('/assets/fonts/Ethnocentric-Regular.woff') format('woff');
   font-weight: normal;
   font-style: normal;
 }

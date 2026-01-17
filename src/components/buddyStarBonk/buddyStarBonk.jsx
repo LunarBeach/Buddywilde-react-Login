@@ -116,12 +116,14 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
   }, [currentState, showingIntro]);
 
   // Check if both players are ready in multiplayer mode
+  // NOTE: In multiplayer, the server sends 'start_intro' when both are ready
+  // This useEffect is only for solo mode fallback
   useEffect(() => {
-    if (currentState === STATE_PRE_GAME_RULES && gameMode === 'challenge' && playerReady && opponentReady) {
-      console.log('Both players ready - starting intro cutscene');
+    if (currentState === STATE_PRE_GAME_RULES && gameVars.current.HUMAN_VS_COMPUTER && playerReady) {
+      console.log('Solo mode - player ready, starting intro cutscene');
       startGameIntro();
     }
-  }, [playerReady, opponentReady, currentState, gameMode]);
+  }, [playerReady, currentState]);
 
   // Play winner/loser sound every 3 seconds when game is over
   useEffect(() => {
@@ -440,6 +442,7 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        console.log('📨 WebSocket message received:', data.type, data);
         handleWebSocketMessage(data);
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
@@ -473,31 +476,45 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
         // Server-authoritative game state update
         if (data.state) {
           // Update ball position from server (only in multiplayer)
+          // Server sends NORMALIZED coordinates (0-1), scale to canvas size
           if (!gameVars.current.HUMAN_VS_COMPUTER) {
-            gameVars.current.ballX = data.state.ball.x;
-            gameVars.current.ballY = data.state.ball.y;
-            gameVars.current.ballSpeedX = data.state.ball.vx;
-            gameVars.current.ballSpeedY = data.state.ball.vy;
+            const gv = gameVars.current;
 
-            // Update opponent paddle position
-            if (gameVars.current.myRole === 'creator') {
+            // Scale normalized coordinates to canvas dimensions
+            gv.ballX = data.state.ball.x * gv.WIDTH;
+            gv.ballY = data.state.ball.y * gv.HEIGHT;
+            gv.ballSpeedX = data.state.ball.vx * gv.WIDTH;
+            gv.ballSpeedY = data.state.ball.vy * gv.HEIGHT;
+            gv.ballLaunched = true;
+
+            // Update opponent paddle position (scaled from normalized)
+            if (gv.myRole === 'creator') {
               // I'm left paddle, update right paddle from server
-              gameVars.current.rightPaddleY = data.state.paddles.right.y;
+              gv.rightPaddleY = data.state.paddles.right.y * (gv.HEIGHT - gv.PADDLE_HEIGHT);
             } else {
               // I'm right paddle, update left paddle from server
-              gameVars.current.leftPaddleY = data.state.paddles.left.y;
+              gv.leftPaddleY = data.state.paddles.left.y * (gv.HEIGHT - gv.PADDLE_HEIGHT);
             }
 
             // Update scores
-            if (data.state.scores.left !== gameVars.current.leftScoreRef) {
-              gameVars.current.leftScoreRef = data.state.scores.left;
+            if (data.state.scores.left !== gv.leftScoreRef) {
+              gv.leftScoreRef = data.state.scores.left;
               setLeftScore(data.state.scores.left);
             }
-            if (data.state.scores.right !== gameVars.current.rightScoreRef) {
-              gameVars.current.rightScoreRef = data.state.scores.right;
+            if (data.state.scores.right !== gv.rightScoreRef) {
+              gv.rightScoreRef = data.state.scores.right;
               setRightScore(data.state.scores.right);
             }
           }
+        }
+        break;
+
+      case 'paddle_hit':
+        // Server says a paddle was hit - play sound
+        console.log('🎾 Paddle hit:', data.paddle);
+        if (audioRefs.current?.paddleStrike) {
+          audioRefs.current.paddleStrike.currentTime = 0;
+          audioRefs.current.paddleStrike.play().catch(e => console.log('Paddle sound failed:', e));
         }
         break;
 
@@ -506,14 +523,34 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
         // Opponent has joined - can show notification
         break;
 
+      case 'both_connected':
+        console.log('✅ Both players connected to WebSocket');
+        // Both players are connected, waiting for READY clicks
+        break;
+
       case 'player_disconnected':
         console.log(`👋 Player disconnected: ${data.role}`);
         // Handle opponent disconnect - maybe pause game or show message
         setOpponentReady(false);
         break;
 
+      case 'opponent_ready':
+        console.log('🎮 Opponent is ready! Role that clicked ready:', data.role);
+        setOpponentReady(true);
+        break;
+
+      case 'start_intro':
+        // Both players clicked READY - start the intro video simultaneously
+        console.log('🎬 SERVER SAYS: Both players ready! Starting intro video...');
+        console.log('🎬 Timestamp from server:', data.timestamp);
+        // Force start the intro - this is the authoritative signal from server
+        startGameIntro();
+        break;
+
       case 'game_started':
-        console.log('🏁 Game started!');
+        // Intro complete for both players - game loop is running on server
+        console.log('🏁 Game started! Ball is live.');
+        // The game loop is now running, game_update messages will sync the ball
         break;
 
       case 'game_over':
@@ -532,11 +569,6 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
         }
         break;
 
-      case 'opponent_ready':
-        console.log('Opponent is ready!');
-        setOpponentReady(true);
-        break;
-
       case 'error':
         console.error('WebSocket error from server:', data.message);
         break;
@@ -547,11 +579,15 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
   };
 
   // Send paddle position to server in multiplayer mode
+  // Sends NORMALIZED coordinates (0-1) so server can work with any canvas size
   const sendPaddleUpdate = (y, direction) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && !gameVars.current.HUMAN_VS_COMPUTER) {
+      const gv = gameVars.current;
+      // Normalize y position to 0-1 range
+      const normalizedY = y / (gv.HEIGHT - gv.PADDLE_HEIGHT);
       wsRef.current.send(JSON.stringify({
         type: 'paddle_move',
-        y: y,
+        y: normalizedY,
         direction: direction
       }));
     }
@@ -987,8 +1023,9 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
         }
       }
 
-      // Ball physics
-      if (gv.ballLaunched) {
+      // Ball physics - only run locally in solo mode
+      // In multiplayer, server sends ball position via WebSocket
+      if (gv.HUMAN_VS_COMPUTER && gv.ballLaunched) {
         gv.ballX += gv.ballSpeedX / 60;
         gv.ballY += gv.ballSpeedY / 60;
 
@@ -1047,7 +1084,7 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
           audioRefs.current.paddleStrike.play().catch(e => console.log('Audio play failed:', e));
         }
 
-        // Scoring
+        // Scoring (solo mode only - multiplayer scoring handled by server)
         let scored = false;
         if (gv.ballX < 0 && !scored) {
           // Update ref immediately for game logic
@@ -1060,9 +1097,7 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
           gv.leftStreak = 0;
           gv.rightLoseStreak = 0;
 
-          if (gv.HUMAN_VS_COMPUTER) {
-            playLoseStreakSound(gv.leftLoseStreak);
-          }
+          playLoseStreakSound(gv.leftLoseStreak);
 
           scored = true;
           gv.totalPointsRef++;
@@ -1092,6 +1127,11 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
 
           if (!gameOver) resetBall();
         }
+      }
+
+      // In multiplayer, mark ball as launched when we receive game_update from server
+      if (!gv.HUMAN_VS_COMPUTER && !gv.ballLaunched && gv.ballX !== gv.WIDTH / 2) {
+        gv.ballLaunched = true;
       }
     }
 
@@ -1168,9 +1208,24 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
   const handlePlayerReady = () => {
     setPlayerReady(true);
 
-    // Start the game intro for both solo and multiplayer modes
-    // In multiplayer, both players will start independently when they click READY
-    startGameIntro();
+    if (gameVars.current.HUMAN_VS_COMPUTER) {
+      // Solo mode - start immediately (useEffect will also trigger but that's ok)
+      console.log('🎮 Solo mode - starting game intro immediately');
+      startGameIntro();
+    } else {
+      // Multiplayer mode - notify server that we're ready
+      // Server will trigger 'start_intro' when both players are ready
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        console.log('📤 Sending player_ready to server...');
+        wsRef.current.send(JSON.stringify({
+          type: 'player_ready'
+        }));
+        console.log('⏳ Waiting for opponent to click READY...');
+      } else {
+        console.error('❌ WebSocket not connected! Cannot send ready signal.');
+        console.log('WebSocket state:', wsRef.current ? wsRef.current.readyState : 'null');
+      }
+    }
   };
 
   const handleQuitPreGame = async () => {
@@ -1413,14 +1468,29 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
           onEnded={() => {
             console.log('Intro video ended');
             setShowingIntro(false);
-            // Start the actual game after intro
             setCurrentState(STATE_PLAYING);
+
+            // In multiplayer mode, notify server that intro is complete
+            if (!gameVars.current.HUMAN_VS_COMPUTER && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              console.log('📤 Sending intro_complete to server...');
+              wsRef.current.send(JSON.stringify({
+                type: 'intro_complete'
+              }));
+            }
           }}
           onError={(e) => {
             console.log('Intro video failed to load:', e);
             // If intro fails, just go straight to game
             setShowingIntro(false);
             setCurrentState(STATE_PLAYING);
+
+            // Still notify server in multiplayer mode
+            if (!gameVars.current.HUMAN_VS_COMPUTER && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+              console.log('📤 Sending intro_complete to server (after error)...');
+              wsRef.current.send(JSON.stringify({
+                type: 'intro_complete'
+              }));
+            }
           }}
         />
       )}

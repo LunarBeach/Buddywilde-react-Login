@@ -8,6 +8,7 @@ import BuddyWiki from './components/buddyWiki/buddyWiki'
 import BuddyEditProfile from './components/buddyEditProfile/buddyEditProfile'
 import BuddyVideoBackground from './components/buddyVideoBackground/buddyVideoBackground'
 import BuddyStarBonk from './components/buddyStarBonk/buddyStarBonk'
+import { api } from './services/api'
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -75,23 +76,18 @@ function App() {
 
     try {
       console.log('Refreshing user data from database...');
-      const response = await fetch('https://buddywilde.com/wp-content/themes/buddy_wilde_theme/bw-db-credentials.php', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'get_user_data',
-          email: currentUser.email
-        })
-      });
-      const data = await response.json();
+      const data = await api.get(`/user/profile?email=${encodeURIComponent(currentUser.email)}`);
       console.log('User data refresh response:', data);
 
       if (data.success && data.user) {
-        setCurrentUser(data.user);
-        localStorage.setItem('currentUser', JSON.stringify(data.user));
-        console.log('User data refreshed successfully:', data.user);
+        // Normalize avatar URL
+        const normalizedUser = {
+          ...data.user,
+          avatar_url: data.user.avatar ? `/assets/avatars/${data.user.avatar}` : null
+        };
+        setCurrentUser(normalizedUser);
+        localStorage.setItem('currentUser', JSON.stringify(normalizedUser));
+        console.log('User data refreshed successfully:', normalizedUser);
       }
     } catch (error) {
       console.error('Error refreshing user data:', error);
