@@ -498,12 +498,14 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
               gv.leftPaddleY = data.state.paddles.left.y * (gv.HEIGHT - gv.PADDLE_HEIGHT);
             }
 
-            // Update scores
+            // Update scores from server
             if (data.state.scores.left !== gv.leftScoreRef) {
+              console.log(`📊 Score update - Left: ${data.state.scores.left} (was ${gv.leftScoreRef})`);
               gv.leftScoreRef = data.state.scores.left;
               setLeftScore(data.state.scores.left);
             }
             if (data.state.scores.right !== gv.rightScoreRef) {
+              console.log(`📊 Score update - Right: ${data.state.scores.right} (was ${gv.rightScoreRef})`);
               gv.rightScoreRef = data.state.scores.right;
               setRightScore(data.state.scores.right);
             }
@@ -541,12 +543,7 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
           audioRefs.current.background.pause();
         }
 
-        // Submit current scores before showing opponent left screen
-        if (currentState === STATE_PLAYING && !gameVars.current.HUMAN_VS_COMPUTER) {
-          submitScores();
-        }
-
-        // Show opponent left screen
+        // Show opponent left screen - scores will be submitted when user clicks Return to Menu
         setCurrentState(STATE_OPPONENT_LEFT);
         break;
 
@@ -834,12 +831,15 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
       }
     }
 
+    // Ensure score is an integer
+    scoreToSend = Math.floor(Number(scoreToSend) || 0);
+
     console.log('=== SUBMITTING SCORE ===');
     console.log('Game mode:', gameMode);
     console.log('My role:', gv.myRole);
-    console.log('Left score (ref):', gv.leftScoreRef);
-    console.log('Right score (ref):', gv.rightScoreRef);
-    console.log('Score to send:', scoreToSend);
+    console.log('Left score (ref):', gv.leftScoreRef, 'type:', typeof gv.leftScoreRef);
+    console.log('Right score (ref):', gv.rightScoreRef, 'type:', typeof gv.rightScoreRef);
+    console.log('Score to send (after Math.floor):', scoreToSend, 'type:', typeof scoreToSend);
     console.log('User email:', user?.email);
     console.log('Challenge ID:', challengeId);
 
@@ -1114,6 +1114,7 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
         if (gv.ballX < 0 && !scored) {
           // Update ref immediately for game logic
           gv.rightScoreRef++;
+          console.log(`🎯 SOLO: AI scored! rightScoreRef is now: ${gv.rightScoreRef}`);
           // Update state for UI display
           setRightScore(gv.rightScoreRef);
 
@@ -1134,6 +1135,7 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
         } else if (gv.ballX > gv.WIDTH && !scored) {
           // Update ref immediately for game logic
           gv.leftScoreRef++;
+          console.log(`🎯 SOLO: Player scored! leftScoreRef is now: ${gv.leftScoreRef}`);
           // Update state for UI display
           setLeftScore(gv.leftScoreRef);
 
@@ -1431,7 +1433,9 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
     }
   };
 
-  const handleExit = async () => {
+  // Return to Star Bonk menu after submitting scores
+  const returnToMenuWithScores = async () => {
+    // End challenge if active
     if (challengeId) {
       try {
         await api.post('/challenge/end', {
@@ -1442,12 +1446,29 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
         console.error('Error ending challenge:', error);
       }
     }
-    // Await score submission to ensure it completes before navigating
+
+    // Submit scores and wait for completion
     await submitScores();
-    // Cleanup game state and audio
+
+    // Cleanup game state
     cleanupGame();
-    // Navigate to home page so user sees updated score in header
-    navigate('/');
+
+    // Reset scores for next game
+    setLeftScore(0);
+    setRightScore(0);
+    gameVars.current.leftScoreRef = 0;
+    gameVars.current.rightScoreRef = 0;
+
+    // Reset challenge state
+    setChallengeId(null);
+    setGameMode('solo');
+
+    // Return to Star Bonk main menu (not homepage)
+    setCurrentState(STATE_MENU);
+  };
+
+  const handleExit = async () => {
+    await returnToMenuWithScores();
   };
 
   const toggleFullscreen = () => {
@@ -1700,7 +1721,7 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
             <p style={{ fontSize: '1.3rem', color: '#ff4444' }}>Your opponent has cancelled this challenge</p>
           </div>
           <div className="menu-buttons">
-            <button onClick={() => { cleanupGame(); navigate('/'); }} className="menu-button">
+            <button onClick={() => { cleanupGame(); setChallengeId(null); setGameMode('solo'); setCurrentState(STATE_MENU); }} className="menu-button">
               Return to Menu
             </button>
           </div>
@@ -1714,11 +1735,11 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
           <div className="rules-content" style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <p style={{ fontSize: '1.3rem', color: '#ff4444' }}>Your opponent has left the game</p>
             <p style={{ fontSize: '1rem', color: 'rgba(255, 255, 255, 0.8)', marginTop: '1rem' }}>
-              Your score has been saved.
+              Your score will be saved.
             </p>
           </div>
           <div className="menu-buttons">
-            <button onClick={() => { cleanupGame(); navigate('/'); }} className="menu-button">
+            <button onClick={returnToMenuWithScores} className="menu-button">
               Return to Menu
             </button>
           </div>
@@ -1775,12 +1796,7 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
             <div className="game-over">
               <div style={{ marginBottom: '2rem' }}>{gameOverMessage}</div>
               <button
-                onClick={async () => {
-                  await submitScores();
-                  cleanupGame();
-                  // Navigate to home page so user sees updated score in header
-                  navigate('/');
-                }}
+                onClick={returnToMenuWithScores}
                 className="menu-button"
                 style={{
                   fontSize: '1.5rem',

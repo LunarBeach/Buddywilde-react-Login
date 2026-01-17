@@ -33,7 +33,9 @@ const GAME_CONFIG = {
   HEIGHT: 600,
   PADDLE_WIDTH: 15,
   PADDLE_HEIGHT: 100,
+  PADDLE_OFFSET: 0.05, // 5% from edge, same as client
   BALL_SIZE: 15,
+  BALL_RADIUS: 50, // Ball radius for collision (PADDLE_HEIGHT / 2)
   INITIAL_BALL_SPEED: 5,
   MAX_BALL_SPEED: 15,
   PADDLE_SPEED: 8,
@@ -69,7 +71,12 @@ function createGameState(challengeId, creatorId, opponentId) {
       left: 0,
       right: 0
     },
-    gameRunning: true,
+    gameRunning: false, // Don't start until both players ready
+    gameStarted: false, // Track if intro has played
+    playersReady: {
+      creator: false,
+      opponent: false
+    },
     lastUpdate: Date.now()
   };
 }
@@ -94,6 +101,9 @@ function updateGame(game) {
   const ball = game.ball;
   const paddles = game.paddles;
 
+  // Store previous ball direction to detect collisions
+  const prevVx = ball.vx;
+
   // Move ball
   ball.x += ball.vx;
   ball.y += ball.vy;
@@ -104,12 +114,21 @@ function updateGame(game) {
     ball.y = Math.max(0, Math.min(GAME_CONFIG.HEIGHT, ball.y));
   }
 
+  // Calculate paddle positions (matching client's 5% offset from edge)
+  const paddleOffset = GAME_CONFIG.WIDTH * GAME_CONFIG.PADDLE_OFFSET;
+  const leftPaddleX = paddleOffset;
+  const rightPaddleX = GAME_CONFIG.WIDTH - GAME_CONFIG.PADDLE_WIDTH - paddleOffset;
+
   // Ball collision with left paddle
-  if (ball.x <= GAME_CONFIG.PADDLE_WIDTH &&
+  // Check if ball's left edge is touching paddle's right edge, and ball is within paddle Y range
+  if (ball.x <= leftPaddleX + GAME_CONFIG.PADDLE_WIDTH &&
+      ball.x >= leftPaddleX &&
       ball.y >= paddles.left.y &&
-      ball.y <= paddles.left.y + GAME_CONFIG.PADDLE_HEIGHT) {
+      ball.y <= paddles.left.y + GAME_CONFIG.PADDLE_HEIGHT &&
+      prevVx < 0) {
 
     ball.vx = Math.abs(ball.vx);
+    ball.x = leftPaddleX + GAME_CONFIG.PADDLE_WIDTH + 1; // Prevent ball from getting stuck
 
     // Add spin based on where ball hit paddle
     const hitPos = (ball.y - paddles.left.y) / GAME_CONFIG.PADDLE_HEIGHT;
@@ -121,14 +140,24 @@ function updateGame(game) {
       ball.vx *= 1.05;
       ball.vy *= 1.05;
     }
+
+    // Broadcast paddle hit event for sound
+    broadcastToGame(game.challengeId, {
+      type: 'paddle_hit',
+      paddle: 'left'
+    });
   }
 
   // Ball collision with right paddle
-  if (ball.x >= GAME_CONFIG.WIDTH - GAME_CONFIG.PADDLE_WIDTH &&
+  // Check if ball's right edge is touching paddle's left edge, and ball is within paddle Y range
+  if (ball.x >= rightPaddleX &&
+      ball.x <= rightPaddleX + GAME_CONFIG.PADDLE_WIDTH &&
       ball.y >= paddles.right.y &&
-      ball.y <= paddles.right.y + GAME_CONFIG.PADDLE_HEIGHT) {
+      ball.y <= paddles.right.y + GAME_CONFIG.PADDLE_HEIGHT &&
+      prevVx > 0) {
 
     ball.vx = -Math.abs(ball.vx);
+    ball.x = rightPaddleX - 1; // Prevent ball from getting stuck
 
     // Add spin based on where ball hit paddle
     const hitPos = (ball.y - paddles.right.y) / GAME_CONFIG.PADDLE_HEIGHT;
@@ -140,17 +169,25 @@ function updateGame(game) {
       ball.vx *= 1.05;
       ball.vy *= 1.05;
     }
+
+    // Broadcast paddle hit event for sound
+    broadcastToGame(game.challengeId, {
+      type: 'paddle_hit',
+      paddle: 'right'
+    });
   }
 
-  // Scoring
-  if (ball.x < 0) {
-    // Right player scores
+  // Scoring - ball must pass the paddle position (not just edge of screen)
+  if (ball.x < leftPaddleX) {
+    // Right player scores (ball passed left paddle)
     game.scores.right++;
+    console.log(`⚽ SCORE! Right player scores. Current: Left=${game.scores.left}, Right=${game.scores.right}`);
     resetBall(game);
     checkWinCondition(game);
-  } else if (ball.x > GAME_CONFIG.WIDTH) {
-    // Left player scores
+  } else if (ball.x > rightPaddleX + GAME_CONFIG.PADDLE_WIDTH) {
+    // Left player scores (ball passed right paddle)
     game.scores.left++;
+    console.log(`⚽ SCORE! Left player scores. Current: Left=${game.scores.left}, Right=${game.scores.right}`);
     resetBall(game);
     checkWinCondition(game);
   }
@@ -176,10 +213,14 @@ function checkWinCondition(game) {
 // Update challenge scores in database
 async function updateChallengeScores(game) {
   try {
+    // Determine winner (creator = left, opponent = right)
+    const winnerId = game.scores.left >= GAME_CONFIG.WIN_SCORE ? game.creatorId : game.opponentId;
+
     await dbPool.query(
-      'UPDATE challenges SET creator_score = ?, opponent_score = ?, status = ? WHERE id = ?',
-      [game.scores.left, game.scores.right, 'finished', game.challengeId]
+      'UPDATE challenges SET creator_score = ?, opponent_score = ?, winner_id = ?, status = ?, ended_at = NOW() WHERE id = ?',
+      [game.scores.left, game.scores.right, winnerId, 'finished', game.challengeId]
     );
+    console.log(`✅ Challenge ${game.challengeId} finished. Winner: ${winnerId}`);
   } catch (error) {
     console.error('Error updating challenge scores:', error);
   }
@@ -243,8 +284,16 @@ async function handleMessage(ws, data) {
       await handleJoinGame(ws, data);
       break;
 
+    case 'player_ready':
+      handlePlayerReady(ws, data);
+      break;
+
     case 'paddle_move':
       handlePaddleMove(ws, data);
+      break;
+
+    case 'intro_complete':
+      handleIntroComplete(ws, data);
       break;
 
     case 'start_game':
@@ -312,31 +361,108 @@ async function handleJoinGame(ws, data) {
 
     if (connectedPlayers.length === 2) {
       console.log(`✅ Both players connected for challenge ${challengeId}`);
-
-      // Start game loop if not already running
-      if (!game.loopInterval) {
-        game.loopInterval = setInterval(() => {
-          updateGame(game);
-
-          // Broadcast state to all players
-          broadcastToGame(challengeId, {
-            type: 'game_update',
-            state: {
-              ball: game.ball,
-              paddles: game.paddles,
-              scores: game.scores,
-              gameRunning: game.gameRunning
-            }
-          });
-        }, TICK_INTERVAL);
-
-        console.log(`🏁 Game loop started for challenge ${challengeId}`);
-      }
+      // Don't start game loop yet - wait for both players to click READY
+      broadcastToGame(challengeId, {
+        type: 'both_connected'
+      });
     }
 
   } catch (error) {
     console.error('Error joining game:', error);
     ws.send(JSON.stringify({ type: 'error', message: 'Failed to join game' }));
+  }
+}
+
+// Handle player clicking READY
+function handlePlayerReady(ws, data) {
+  const playerInfo = playerConnections.get(ws);
+  if (!playerInfo) return;
+
+  const game = games.get(playerInfo.challengeId);
+  if (!game) return;
+
+  // Mark this player as ready
+  game.playersReady[playerInfo.role] = true;
+  console.log(`✅ Player ${playerInfo.role} is ready for challenge ${playerInfo.challengeId}`);
+
+  // Notify the other player that this player is ready
+  broadcastToGame(playerInfo.challengeId, {
+    type: 'opponent_ready',
+    role: playerInfo.role
+  });
+
+  // Check if both players are ready
+  if (game.playersReady.creator && game.playersReady.opponent) {
+    console.log(`🎬 Both players ready! Starting intro for challenge ${playerInfo.challengeId}`);
+
+    // Tell both clients to start the intro video simultaneously
+    broadcastToGame(playerInfo.challengeId, {
+      type: 'start_intro',
+      timestamp: Date.now()
+    });
+  }
+}
+
+// Handle intro video complete - start the actual game
+function handleIntroComplete(ws, data) {
+  const playerInfo = playerConnections.get(ws);
+  if (!playerInfo) return;
+
+  const game = games.get(playerInfo.challengeId);
+  if (!game) return;
+
+  // Track which players have finished intro
+  if (!game.introComplete) {
+    game.introComplete = { creator: false, opponent: false };
+  }
+  game.introComplete[playerInfo.role] = true;
+
+  console.log(`🎬 Player ${playerInfo.role} finished intro for challenge ${playerInfo.challengeId}`);
+
+  // When both have finished intro, start the game loop
+  if (game.introComplete.creator && game.introComplete.opponent && !game.loopInterval) {
+    console.log(`🏁 Both intros complete! Starting game for challenge ${playerInfo.challengeId}`);
+
+    game.gameRunning = true;
+    game.gameStarted = true;
+    resetBall(game);
+
+    // Tell both clients the game is starting
+    broadcastToGame(playerInfo.challengeId, {
+      type: 'game_started',
+      state: {
+        ball: game.ball,
+        paddles: game.paddles,
+        scores: game.scores
+      }
+    });
+
+    // Start the game loop
+    game.loopInterval = setInterval(() => {
+      updateGame(game);
+
+      // Broadcast state to all players with NORMALIZED coordinates (0-1 range)
+      // This allows clients with different canvas sizes to scale appropriately
+      broadcastToGame(playerInfo.challengeId, {
+        type: 'game_update',
+        state: {
+          ball: {
+            x: game.ball.x / GAME_CONFIG.WIDTH,
+            y: game.ball.y / GAME_CONFIG.HEIGHT,
+            vx: game.ball.vx / GAME_CONFIG.WIDTH,
+            vy: game.ball.vy / GAME_CONFIG.HEIGHT
+          },
+          paddles: {
+            left: { y: game.paddles.left.y / GAME_CONFIG.HEIGHT },
+            right: { y: game.paddles.right.y / GAME_CONFIG.HEIGHT }
+          },
+          scores: game.scores,
+          gameRunning: game.gameRunning
+        }
+      });
+    }, TICK_INTERVAL);
+
+    console.log(`🎮 Game loop started for challenge ${playerInfo.challengeId}`);
   }
 }
 
@@ -350,6 +476,9 @@ function handlePaddleMove(ws, data) {
 
   const { y, direction } = data;
 
+  // Convert normalized y (0-1) to server coordinates if provided
+  const serverY = y !== undefined ? y * GAME_CONFIG.HEIGHT : undefined;
+
   // Update paddle position
   if (playerInfo.role === 'creator') {
     // Creator controls left paddle
@@ -360,9 +489,9 @@ function handlePaddleMove(ws, data) {
         GAME_CONFIG.HEIGHT - GAME_CONFIG.PADDLE_HEIGHT,
         game.paddles.left.y + GAME_CONFIG.PADDLE_SPEED
       );
-    } else if (y !== undefined) {
-      // Direct position update
-      game.paddles.left.y = Math.max(0, Math.min(GAME_CONFIG.HEIGHT - GAME_CONFIG.PADDLE_HEIGHT, y));
+    } else if (serverY !== undefined) {
+      // Direct position update (from normalized coordinates)
+      game.paddles.left.y = Math.max(0, Math.min(GAME_CONFIG.HEIGHT - GAME_CONFIG.PADDLE_HEIGHT, serverY));
     }
   } else if (playerInfo.role === 'opponent') {
     // Opponent controls right paddle
@@ -373,9 +502,9 @@ function handlePaddleMove(ws, data) {
         GAME_CONFIG.HEIGHT - GAME_CONFIG.PADDLE_HEIGHT,
         game.paddles.right.y + GAME_CONFIG.PADDLE_SPEED
       );
-    } else if (y !== undefined) {
-      // Direct position update
-      game.paddles.right.y = Math.max(0, Math.min(GAME_CONFIG.HEIGHT - GAME_CONFIG.PADDLE_HEIGHT, y));
+    } else if (serverY !== undefined) {
+      // Direct position update (from normalized coordinates)
+      game.paddles.right.y = Math.max(0, Math.min(GAME_CONFIG.HEIGHT - GAME_CONFIG.PADDLE_HEIGHT, serverY));
     }
   }
 }
