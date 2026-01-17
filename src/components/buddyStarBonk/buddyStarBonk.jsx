@@ -14,6 +14,7 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
   const STATE_WAITING_FOR_OPPONENT = 'waiting_for_opponent';
   const STATE_PRE_GAME_RULES = 'pre_game_rules';
   const STATE_OPPONENT_CANCELLED = 'opponent_cancelled';
+  const STATE_OPPONENT_LEFT = 'opponent_left';
 
   // State management
   const [currentState, setCurrentState] = useState(STATE_MENU);
@@ -101,7 +102,8 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
                         currentState === STATE_RULES ||
                         currentState === STATE_WAITING_FOR_OPPONENT ||
                         currentState === STATE_PRE_GAME_RULES ||
-                        currentState === STATE_OPPONENT_CANCELLED;
+                        currentState === STATE_OPPONENT_CANCELLED ||
+                        currentState === STATE_OPPONENT_LEFT;
 
     // Play background sound in menu states or during gameplay, but stop during intro
     if (isMenuState && !showingIntro) {
@@ -530,8 +532,22 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
 
       case 'player_disconnected':
         console.log(`👋 Player disconnected: ${data.role}`);
-        // Handle opponent disconnect - maybe pause game or show message
+        // Handle opponent disconnect - stop game and show message
         setOpponentReady(false);
+        gameVars.current.gameRunning = false;
+
+        // Stop any playing audio
+        if (audioRefs.current?.background) {
+          audioRefs.current.background.pause();
+        }
+
+        // Submit current scores before showing opponent left screen
+        if (currentState === STATE_PLAYING && !gameVars.current.HUMAN_VS_COMPUTER) {
+          submitScores();
+        }
+
+        // Show opponent left screen
+        setCurrentState(STATE_OPPONENT_LEFT);
         break;
 
       case 'opponent_ready':
@@ -806,13 +822,21 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
   const submitScores = async () => {
     const gv = gameVars.current;
     // Use ref values to get accurate real-time scores
-    let scoreToSend = gv.leftScoreRef;
+    let scoreToSend = gv.leftScoreRef; // Default for solo mode (player is always left)
+
+    // In multiplayer mode, send the score for THIS player's paddle
     if (gameMode === 'challenge' || gameMode === 'accept') {
-      scoreToSend = gv.leftScoreRef + gv.rightScoreRef;
+      // Creator controls left paddle, opponent controls right paddle
+      if (gv.myRole === 'creator') {
+        scoreToSend = gv.leftScoreRef; // Creator's score is left score
+      } else {
+        scoreToSend = gv.rightScoreRef; // Opponent's score is right score
+      }
     }
 
     console.log('=== SUBMITTING SCORE ===');
     console.log('Game mode:', gameMode);
+    console.log('My role:', gv.myRole);
     console.log('Left score (ref):', gv.leftScoreRef);
     console.log('Right score (ref):', gv.rightScoreRef);
     console.log('Score to send:', scoreToSend);
@@ -841,7 +865,8 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
         // Call the callback to refresh user data in parent component
         if (onScoreSubmitted) {
           console.log('Calling onScoreSubmitted callback to refresh user data...');
-          onScoreSubmitted();
+          await onScoreSubmitted();
+          console.log('✓ User data refresh callback completed');
         } else {
           console.warn('WARNING: onScoreSubmitted callback is not defined!');
         }
@@ -1159,6 +1184,40 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
     gameLoopRef.current = requestAnimationFrame(gameLoop);
   };
 
+  // Cleanup function for when leaving the game
+  const cleanupGame = () => {
+    // Disconnect WebSocket if connected
+    disconnectWebSocket();
+
+    // Stop game loop
+    gameVars.current.gameRunning = false;
+    gameVars.current.myRole = null;
+    if (gameLoopRef.current) {
+      cancelAnimationFrame(gameLoopRef.current);
+    }
+    if (challengePollingRef.current) {
+      clearInterval(challengePollingRef.current);
+    }
+
+    // Stop all audio
+    if (audioRefs.current?.background) {
+      audioRefs.current.background.pause();
+      audioRefs.current.background.currentTime = 0;
+    }
+    if (audioRefs.current?.rocketSound) {
+      audioRefs.current.rocketSound.pause();
+    }
+
+    // Reset gameplay video opacity for next game
+    if (gameplayVideoRef.current) {
+      gameplayVideoRef.current.classList.remove('gameplay-fade');
+    }
+
+    // Reset opponent info
+    setOpponentName(null);
+    setOpponentAvatar(null);
+  };
+
   // Menu and state control functions
   const showMenu = async () => {
     // If there's an active challenge, cancel it
@@ -1175,27 +1234,8 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
       setChallengeId(null);
     }
 
-    // Disconnect WebSocket if connected
-    disconnectWebSocket();
-
+    cleanupGame();
     setCurrentState(STATE_MENU);
-    gameVars.current.gameRunning = false;
-    gameVars.current.myRole = null; // Clear multiplayer role
-    audioRefs.current.background.pause();
-    audioRefs.current.background.currentTime = 0;
-    if (gameLoopRef.current) {
-      cancelAnimationFrame(gameLoopRef.current);
-    }
-    if (challengePollingRef.current) {
-      clearInterval(challengePollingRef.current);
-    }
-    // Reset gameplay video opacity for next game
-    if (gameplayVideoRef.current) {
-      gameplayVideoRef.current.classList.remove('gameplay-fade');
-    }
-    // Reset opponent info
-    setOpponentName(null);
-    setOpponentAvatar(null);
   };
 
   const showGame = () => {
@@ -1402,8 +1442,12 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
         console.error('Error ending challenge:', error);
       }
     }
-    submitScores();
-    showMenu();
+    // Await score submission to ensure it completes before navigating
+    await submitScores();
+    // Cleanup game state and audio
+    cleanupGame();
+    // Navigate to home page so user sees updated score in header
+    navigate('/');
   };
 
   const toggleFullscreen = () => {
@@ -1425,7 +1469,7 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
   return (
     <div id="star-bonk-game" className="star-bonk-container">
       {/* Space flight loop video for menus and waiting states */}
-      {(currentState === STATE_MENU || currentState === STATE_CHALLENGE_LIST || currentState === STATE_RULES || currentState === STATE_WAITING_FOR_OPPONENT || currentState === STATE_PRE_GAME_RULES || currentState === STATE_OPPONENT_CANCELLED) && !showingIntro && (
+      {(currentState === STATE_MENU || currentState === STATE_CHALLENGE_LIST || currentState === STATE_RULES || currentState === STATE_WAITING_FOR_OPPONENT || currentState === STATE_PRE_GAME_RULES || currentState === STATE_OPPONENT_CANCELLED || currentState === STATE_OPPONENT_LEFT) && !showingIntro && (
         <video
           ref={backgroundVideoRef}
           className="background-video"
@@ -1656,7 +1700,25 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
             <p style={{ fontSize: '1.3rem', color: '#ff4444' }}>Your opponent has cancelled this challenge</p>
           </div>
           <div className="menu-buttons">
-            <button onClick={showMenu} className="menu-button">
+            <button onClick={() => { cleanupGame(); navigate('/'); }} className="menu-button">
+              Return to Menu
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Opponent Left During Game */}
+      {currentState === STATE_OPPONENT_LEFT && (
+        <div className="game-menu">
+          <h2 className="game-title">Opponent Left</h2>
+          <div className="rules-content" style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <p style={{ fontSize: '1.3rem', color: '#ff4444' }}>Your opponent has left the game</p>
+            <p style={{ fontSize: '1rem', color: 'rgba(255, 255, 255, 0.8)', marginTop: '1rem' }}>
+              Your score has been saved.
+            </p>
+          </div>
+          <div className="menu-buttons">
+            <button onClick={() => { cleanupGame(); navigate('/'); }} className="menu-button">
               Return to Menu
             </button>
           </div>
@@ -1669,8 +1731,13 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
           <div className="game-hud">
             <div className="score left-score">
               <div className="player-info">
-                {user.avatar_url && (
-                  <img src={user.avatar_url} alt={user.display_name} className="player-avatar" />
+                {(user.avatar_url || user.avatar) && (
+                  <img
+                    src={user.avatar_url || `/assets/avatars/${user.avatar}`}
+                    alt={user.display_name}
+                    className="player-avatar"
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
                 )}
                 <span className="player-username">{user.display_name}</span>
               </div>
@@ -1688,7 +1755,12 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
                 <div className="player-info">
                   <span className="player-username">{opponentName}</span>
                   {opponentAvatar && (
-                    <img src={opponentAvatar} alt={opponentName} className="player-avatar" />
+                    <img
+                      src={opponentAvatar}
+                      alt={opponentName}
+                      className="player-avatar"
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
                   )}
                 </div>
               )}
@@ -1703,9 +1775,11 @@ const BuddyStarBonk = ({ user, isLoggedIn, onScoreSubmitted }) => {
             <div className="game-over">
               <div style={{ marginBottom: '2rem' }}>{gameOverMessage}</div>
               <button
-                onClick={() => {
-                  submitScores();
-                  showMenu();
+                onClick={async () => {
+                  await submitScores();
+                  cleanupGame();
+                  // Navigate to home page so user sees updated score in header
+                  navigate('/');
                 }}
                 className="menu-button"
                 style={{
